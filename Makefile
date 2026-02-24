@@ -13,4 +13,4 @@ vet: fmt
 	go vet ./...
 
 build: vet
-	go build -o jdextractor ./cmd
+	go build -o out/jdextractor ./cmd
