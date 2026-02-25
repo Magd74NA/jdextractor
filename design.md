@@ -1,4 +1,3 @@
----
 
 # Design Document: jdextract
 
@@ -45,10 +44,11 @@ Every run creates a "Run Folder" under the data directory, forming a searchable 
 ```text
 <exe_dir>/
 ├── jdextract                 # binary
-├── config                    # KEY=VALUE config (optional, fallback to env vars)
-├── templates/
-│   ├── resume.txt            # The user's master resume
-│   └── cover.txt             # The user's base cover letter (optional)
+├── config/                   # Configuration directory
+│   ├── config                # KEY=VALUE config (optional, fallback to env vars)
+│   └── templates/
+│       ├── resume.txt        # The user's master resume
+│       └── cover.txt         # The user's base cover letter (optional)
 └── data/
     └── jobs/
         └── 2026-02-24_acme-corp_copywriter_a7x9/    <-- "Run Folder"

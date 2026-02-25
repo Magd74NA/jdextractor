@@ -6,7 +6,7 @@
 - [x] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
 - [x] Add `golang.org/x/net/html` dependency
 - [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
-- [ ] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
+- [-] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
 - [ ] `config.go`: parse `<exe_dir>/config` (KEY=VALUE, `#` comments, env var > file > default)
 - [ ] `config.go`: create config file with `0600` permissions (contains API key); job files use `0644`
 

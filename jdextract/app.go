@@ -10,16 +10,21 @@ import (
 
 type PortablePaths struct {
 	Root      string
+	Jobs      string
 	Data      string
 	Config    string
 	Templates string
+}
+
+type App struct {
+	paths PortablePaths
 }
 
 func CheckWiring() {
 	fmt.Println("Hello from app.go")
 }
 
-func GetPortablePaths() (*PortablePaths, error) {
+func getPortablePaths() (*PortablePaths, error) {
 	execPath, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("error resolving exec: %w", err)
@@ -52,15 +57,39 @@ func GetPortablePaths() (*PortablePaths, error) {
 	paths := &PortablePaths{
 		Root:      root,
 		Data:      filepath.Join(root, "data"),
+		Jobs:      filepath.Join(root, "data", "jobs"),
 		Config:    filepath.Join(root, "config"),
-		Templates: filepath.Join(root, "templates"),
+		Templates: filepath.Join(root, "config", "templates"),
 	}
 
+	return paths, nil
+}
+
+func (A *App) Setup() error {
 	// Create directories if they don't exist
-	for _, dir := range []string{paths.Data, paths.Config} {
+	for _, dir := range []string{A.paths.Data, A.paths.Config, A.paths.Jobs, A.paths.Templates} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("cannot create %s: %w", dir, err)
+			return fmt.Errorf("cannot create %s: %w", dir, err)
 		}
 	}
-	return paths, nil
+	return nil
+}
+
+func NewApp() *App {
+	paths, err := getPortablePaths()
+	if err != nil {
+		fmt.Printf("errors: %s", err)
+		os.Exit(1)
+	}
+	app := &App{
+		paths: *paths,
+	}
+
+	err = app.Setup()
+
+	if err != nil {
+		fmt.Printf("error")
+		os.Exit(1)
+	}
+	return app
 }
