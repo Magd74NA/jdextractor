@@ -27,7 +27,7 @@ jdextract/
 │       └── index.html       # Embedded UI (HTML/Alpine/Tailwind/DaisyUI)
 └── jdextract/               # Core package (importable library)
     ├── app.go               # Central App struct
-    ├── config.go            # ~/.jdextract paths, env vars + config file
+    ├── config.go            # Portable paths, env vars + config file
     ├── fetch.go             # Hybrid HTTP fetch with fallback strategies
     ├── parse.go             # HTML parsing (company/role + slug)
     ├── llm.go               # DeepSeek HTTP client, retry logic
@@ -38,22 +38,25 @@ jdextract/
 The `//go:embed web` directive in `cmd/main.go` embeds the UI. `fs.Sub(webFiles, "web")` strips the prefix before passing to `App.Serve()`.
 
 ## 4. Data Model (Filesystem as CRM)
-Every run creates a "Run Folder" under the output directory, forming a searchable application history.
+Every run creates a "Run Folder" under the data directory, forming a searchable application history.
 
-**Base Directory:** `~/.jdextract/`
+**Portable layout** — all paths resolve relative to the executable via `GetPortablePaths()`. On macOS inside a `.app` bundle, the root is the directory containing the `.app`. No hard-coded home directory.
+
 ```text
-~/.jdextract/
+<exe_dir>/
+├── jdextract                 # binary
 ├── config                    # KEY=VALUE config (optional, fallback to env vars)
 ├── templates/
 │   ├── resume.txt            # The user's master resume
 │   └── cover.txt             # The user's base cover letter (optional)
-└── jobs/
-    └── 2026-02-24_acme-corp_copywriter_a7x9/    <-- "Run Folder"
-        ├── job.json                          # Structured metadata
-        ├── job_raw.txt                       # Scraped webpage content
-        ├── resume_custom.txt                 # AI-tailored resume
-        ├── cover_letter.txt                  # AI-drafted cover letter (optional)
-        └── notes.md                          # Freeform user notes
+└── data/
+    └── jobs/
+        └── 2026-02-24_acme-corp_copywriter_a7x9/    <-- "Run Folder"
+            ├── job.json                          # Structured metadata
+            ├── job_raw.txt                       # Scraped webpage content
+            ├── resume_custom.txt                 # AI-tailored resume
+            ├── cover_letter.txt                  # AI-drafted cover letter (optional)
+            └── notes.md                          # Freeform user notes
 ```
 
 ### Job Metadata (`job.json`)
@@ -88,17 +91,18 @@ type JobDetail struct {
 ## 5. System Components (The `jdextract` package)
 
 ### `App` (app.go)
-Central orchestrator holding configuration. Used by both CLI and Web interfaces.
+Central orchestrator holding configuration and portable paths. Used by both CLI and Web interfaces.
 
 ```go
+func GetPortablePaths() (*PortablePaths, error)
 func NewApp() *App
 func (a *App) Setup() error
 ```
 
-The caller (`main.go`) creates the root context via `signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)` and passes it into App methods. App does not handle signals itself.
+`GetPortablePaths()` resolves the executable's location (following symlinks), then derives `config`, `templates/`, and `data/` paths relative to it. On macOS inside a `.app` bundle, it walks up to the directory containing the `.app`. The caller (`main.go`) creates the root context via `signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)` and passes it into App methods. App does not handle signals itself.
 
 ### `Config` (config.go)
-*   Resolves `~/.jdextract` paths and reads `~/.jdextract/config` (KEY=VALUE format, `#` comments).
+*   Reads `<exe_dir>/config` (KEY=VALUE format, `#` comments). Path provided by `GetPortablePaths()`.
 *   Precedence: **env var > config file > default/error**. `DEEPSEEK_MODEL` defaults to `deepseek-chat`.
 *   **Permissions:** Config file created with `0600` (contains API key). Job output files use `0644`.
 
@@ -171,7 +175,7 @@ func (a *App) Process(ctx context.Context, input JobInput) (*JobResult, error)
 4. Apply `slug()` to company and role
 5. Generate UUID v4 (`crypto/rand`)
 6. Generate folder hash suffix: first 4 hex chars of SHA-256 of the source (URL string, absolute file path, or raw text)
-7. Create run folder `~/.jdextract/jobs/YYYY-MM-DD_company_role_hash/`
+7. Create run folder `<exe_dir>/data/jobs/YYYY-MM-DD_company_role_hash/`
 8. Save `job_raw.txt`
 9. Call LLM (resume + optional cover letter)
 10. Write output files (`resume_custom.txt`, `cover_letter.txt`)
@@ -201,7 +205,7 @@ Accepts bare port number (e.g. `"8080"`), prepends `:` internally. Uses `http.Se
 ```bash
 $ jdextract setup
 $ jdextract generate https://acme.com/job/123
-  > Saved to: ~/.jdextract/jobs/2026-02-24_acme_copywriter_a7x9/
+  > Saved to: ./data/jobs/2026-02-24_acme_copywriter_a7x9/
   > Resume: resume_custom.txt  |  Cover: cover_letter.txt
   > Tokens used: 2847
 $ jdextract generate --local ./my_job_paste.txt

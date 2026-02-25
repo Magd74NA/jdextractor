@@ -3,10 +3,11 @@
 ## Phase 1: Core Infrastructure
 
 ### Setup
-- [ ] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
-- [ ] Add `golang.org/x/net/html` dependency
-- [ ] `app.go`: implement `NewApp()` and `Setup()` (creates `~/.jdextract/`, `templates/`, `jobs/`, example templates)
-- [ ] `config.go`: parse `~/.jdextract/config` (KEY=VALUE, `#` comments, env var > file > default)
+- [x] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
+- [x] Add `golang.org/x/net/html` dependency
+- [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
+- [ ] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
+- [ ] `config.go`: parse `<exe_dir>/config` (KEY=VALUE, `#` comments, env var > file > default)
 - [ ] `config.go`: create config file with `0600` permissions (contains API key); job files use `0644`
 
 ### Fetching
@@ -46,7 +47,7 @@
 
 - [ ] `cmd/main.go`: `flag.NewFlagSet` per subcommand
 - [ ] `cmd/main.go`: root context via `signal.NotifyContext` (os.Interrupt, SIGTERM)
-- [ ] `jdextract setup` — initialize `~/.jdextract` directory and templates
+- [ ] `jdextract setup` — initialize portable directory structure and example templates
 - [ ] `jdextract generate <url>` — fetch, generate, save; display paths and token count
 - [ ] `jdextract generate --local <file>` — process saved text file
 - [ ] `jdextract generate --no-cover` — skip cover letter (default: generate if `templates/cover.txt` exists)
