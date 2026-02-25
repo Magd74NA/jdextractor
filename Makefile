@@ -1,10 +1,10 @@
 
 .DEFAULT_GOAL := build
 
-.PHONY: fmt vet build clean
+.PHONY: fmt vet build clean run
 
 clean:
-	go clean
+	go clean && rm -rf out/
 
 fmt:
 	go fmt ./...
@@ -14,3 +14,6 @@ vet: fmt
 
 build: vet
 	go build -o out/jdextractor ./cmd
+
+run: build
+	./out/jdextractor
