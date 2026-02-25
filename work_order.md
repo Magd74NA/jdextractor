@@ -1,143 +1,85 @@
 # Work Order: jdextract
 
-## Phase 1: Foundation (No Dependencies)
+## Phase 1: Core Infrastructure
 
-### Core Infrastructure
-- [ ] Learn `go/embed` - embed `web/` directory from `cmd/jdextract/main.go`; pass `fs.FS` into `App.Serve()` (embed directive must be in same package as the embedded directory)
-- [ ] Learn `go/http` - basic HTTP client for fetching job posting URLs
-- [ ] Learn `go/flag` - create CLI with subcommands using `flag.NewFlagSet` per command
-- [ ] Set up project structure following design (cmd/, jdextract/, cmd/jdextract/web/)
-- [ ] Add `golang.org/x/net/html` dependency for HTML parsing (zero external deps, stays in Go ecosystem)
+### Setup
+- [ ] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
+- [ ] Add `golang.org/x/net/html` dependency
+- [ ] `app.go`: implement `NewApp()` and `Setup()` (creates `~/.jdextract/`, `templates/`, `jobs/`, example templates)
+- [ ] `config.go`: parse `~/.jdextract/config` (KEY=VALUE, `#` comments, env var > file > default)
+- [ ] `config.go`: create config file with `0600` permissions (contains API key); job files use `0644`
 
-### Configuration & Setup
-- [ ] Implement `config.go` - resolve `~/.jdextract` paths
-- [ ] Support both config.yaml AND `DEEPSEEK_API_KEY` env var
-- [ ] **Precedence: env var > config.yaml > error** (12-factor app convention)
-- [ ] Implement `app.go` - central App struct with `NewApp()` and `Setup()` methods
-- [ ] Create directory structure: `~/.jdextract/`, `templates/`, `jobs/`
-- [ ] Generate example templates (`resume.txt`, `cover.txt`) on first setup
+### Fetching
+- [ ] `fetch.go`: hybrid strategy — direct GET, then `r.jina.ai/{url}`, then error with `--local` hint
+- [ ] `fetch.go`: size caps (500KB raw HTML, 100KB Jina)
+- [ ] `fetch.go`: distinct errors — `ErrJinaRateLimited` (429, suggest retry) vs `ErrJinaExtraction` (suggest `--local`)
 
-### HTML Fetching (Hybrid Strategy)
-- [ ] Implement `fetch.go` with hybrid fetch strategy:
-  - [ ] First: Direct HTTP GET (works for static sites, Greenhouse, Lever)
-  - [ ] Second: Try `https://r.jina.ai/http://URL` (extracts text from React SPAs)
-  - [ ] Third: Fail gracefully with `--local` flag suggestion
-- [ ] Add size caps: 500KB for raw HTML, 100KB for Jina markdown responses (markdown is denser)
-- [ ] Add `--local <file>` flag — reads a saved text file; update error message to say "save text to a file and re-run with --local ./file.txt"
-
-### HTML Parsing (No LLM)
-- [ ] Implement `parse.go` with `golang.org/x/net/html`
-- [ ] Extract company name from `<title>` and `<h1>` tags
-- [ ] Extract role from common job board patterns
-- [ ] Add regex patterns for Greenhouse, Lever, Workday, etc.
-- [ ] Only fallback to LLM if HTML parsing completely fails
-- [ ] Implement `slug()` helper: normalize extracted strings for safe folder names (`"Acme & Co." → "acme-co"`)
+### Parsing
+- [ ] `parse.go`: extract company/role from `<title>` and `<h1>` via `golang.org/x/net/html`
+- [ ] `parse.go`: regex patterns for common job board formats
+- [ ] `parse.go`: `slug()` — returns `"unknown"` when sanitized result is empty
 
 ---
 
-## Phase 2: LLM Integration (DeepSeek API)
+## Phase 2: LLM Integration
 
-### API Client
-- [ ] Wire DeepSeek API in `llm.go` - HTTP client for `api.deepseek.com`
-- [ ] Handle API authentication and error responses
-- [ ] Implement exponential backoff retry for HTTP 429 (rate limit) responses
-
-### Prompt Engineering
-- [ ] Design batched prompt combining resume + cover letter; use `response_format: {"type": "json_object"}` (DeepSeek JSON mode) to get `{"resume": "...", "cover_letter": "..."}` — avoids fragile delimiter splitting
-- [ ] Design fallback prompt for LLM-based company/role extraction (only when HTML parsing fails)
-- [ ] Handle optional cover letter (skip section when `baseCover` is nil; omit `cover_letter` key in response schema)
-- [ ] Draft system prompt + user prompt templates in design doc before implementing `llm.go`
-
-### LLM Functions
-- [ ] `GenerateAll(ctx context.Context, jobText, baseResume string, baseCover *string) (resume string, cover *string, tokensUsed int, err error)`
-  - Pass `nil` for `baseCover` to skip cover letter generation
-  - Returns `nil` for `cover` when not generated
+- [ ] `llm.go`: HTTP client for `api.deepseek.com` with auth and error handling
+- [ ] `llm.go`: exponential backoff on HTTP 429; non-429 errors return immediately
+- [ ] `llm.go`: batched prompt using `response_format: {"type": "json_object"}`; decode into raw map first, check key existence before struct assignment
+- [ ] `llm.go`: fallback prompt for company/role extraction (when HTML parsing fails)
+- [ ] `llm.go`: implement `GenerateAll()` — pass `nil` for `baseCover` to skip cover letter (see design.md section 5)
 
 ---
 
 ## Phase 3: Generation Pipeline
 
-### Data Structures
-- [ ] Define `JobInput` struct with URL and LocalFile fields (mutually exclusive)
-- [ ] Define `JobResult` struct with ID, Company, Role, TokensUsed, FolderPath, ResumePath, CoverPath
-- [ ] Define `JobMetadata` struct for `job.json`:
-  - `id` (UUID v4)
-  - `company`, `role`, `status`
-  - `date_created` (ISO 8601), `date_applied`
-  - `url`, `tokens_used`, `notes_md`
-
-### Data Structures (validation)
-- [ ] Validate `JobInput` mutual exclusivity at the start of `Process()`:
-  - Error if both `URL` and `LocalFile` are set
-  - Error if neither is set
-
-### Orchestration (`generate.go`)
-- [ ] Implement `Process(ctx context.Context, input JobInput) (*JobResult, error)`
-  - [ ] Validate `JobInput` (mutually exclusive fields)
-  - [ ] Read job text from URL (hybrid fetch) or local file
-  - [ ] Extract company name & role via golang.org/x/net/html (fallback to LLM)
-  - [ ] Apply `slug()` to company and role before building folder name
-  - [ ] Generate UUID v4 for the job
-  - [ ] Generate URL hash suffix for collision prevention
-  - [ ] Create run folder: `~/.jdextract/jobs/YYYY-MM-DD_slug-company_slug-role_URLHash/`
-  - [ ] Save `job_raw.txt` (scraped/pasted content)
-  - [ ] Call LLM batched generate (resume + optional cover letter)
-  - [ ] Write `resume_custom.txt` and `cover_letter.txt` (if generated)
-  - [ ] Create `job.json` with metadata including `id` and `date_created`
-- [ ] Thread `context.Context` through `Process()`, `Fetch()`, and `GenerateAll()` from the start (retrofitting later is painful)
+- [ ] `generate.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
+- [ ] `generate.go`: implement `Process()` following workflow in design.md section 5
+- [ ] `generate.go`: URL path uses HTML parse then LLM fallback; LocalFile/RawText skip directly to LLM extraction
+- [ ] `generate.go`: accept `context.Context` throughout (web callers set 300s timeout)
+- [ ] `generate.go`: atomic write for `job.json` (write `.tmp`, then `os.Rename`)
+- [ ] `generate.go`: on partial failure, leave folder on disk; error if folder already exists on re-run
 
 ---
 
 ## Phase 4: CLI Interface
 
-### Command Structure (`cmd/jdextract/main.go`)
-- [ ] Use `flag.NewFlagSet` per subcommand (cleaner than global `flag.Parse`)
-- [ ] `jdextract setup` - initialize ~/.jdextract directory and templates
-- [ ] `jdextract resume <url>` - fetch job, generate resume + cover letter, save to disk
-- [ ] `jdextract resume --local <file>` - process a saved text file instead of URL
-- [ ] `jdextract resume --no-cover <url>` - skip cover letter generation
-- [ ] `jdextract list` - print tabular job history (ID, date, company, role, status)
-- [ ] `jdextract status <id|folder-name> <status>` - update status field in job.json
-- [ ] `jdextract serve` - launch web UI
-
-### User Experience
-- [ ] Display folder path, resume path, cover path, and tokens used after generation
-- [ ] Show "Skipping cover letter" message when template missing or `--no-cover`
-- [ ] Add progress indicators for long-running operations
-- [ ] Implement meaningful error messages:
-  - [ ] "API key missing (set DEEPSEEK_API_KEY or add to config.yaml)"
-  - [ ] "Fetch failed — save the job text to a file and re-run with --local ./file.txt"
-- [ ] Add `--help` documentation for each command
+- [ ] `cmd/main.go`: `flag.NewFlagSet` per subcommand
+- [ ] `cmd/main.go`: root context via `signal.NotifyContext` (os.Interrupt, SIGTERM)
+- [ ] `jdextract setup` — initialize `~/.jdextract` directory and templates
+- [ ] `jdextract generate <url>` — fetch, generate, save; display paths and token count
+- [ ] `jdextract generate --local <file>` — process saved text file
+- [ ] `jdextract generate --no-cover` — skip cover letter (default: generate if `templates/cover.txt` exists)
+- [ ] `jdextract list` — tabular output via `text/tabwriter`; UUID truncated to 8 chars; skip corrupt `job.json` with warning
+- [ ] `jdextract status <prefix> <status>` — UUID prefix match, validate against `draft|applied|interviewing|offer|rejected`
+- [ ] `jdextract serve --port <port>` — pass root context into `Serve()` for graceful shutdown (default 8080)
+- [ ] Error messages: missing API key, fetch failure with `--local` hint
 
 ---
 
 ## Phase 5: Web Interface
 
 ### Backend (`web.go`)
-- [ ] `//go:embed web` lives in `cmd/jdextract/main.go`; `web.go` accepts `fs.FS` as a parameter
-- [ ] Implement `Serve(port string, ui fs.FS)` - start HTTP server
-- [ ] `POST /api/process` - accepts `{ "url": "..." }` or `{ "local_text": "..." }`, returns `JobResult`
-- [ ] `GET /api/jobs` - lists all jobs with filtering/sorting by status, date, company
-- [ ] `GET /api/jobs/{id}` - get job metadata by UUID
-- [ ] `PATCH /api/jobs/{id}` - update job metadata (status, notes)
-- [ ] Add Origin header validation for CSRF protection (even on localhost)
+- [ ] `Serve(ctx, port, ui)` — accepts context for graceful shutdown via `http.Server.Shutdown(ctx)`
+- [ ] `POST /api/process` — wraps `Process()` with `context.WithTimeout` (300s)
+- [ ] `GET /api/jobs` — list with filtering/sorting; tolerates corrupt `job.json` (log + skip)
+- [ ] `GET /api/jobs/{id}` — returns `JobDetail` (job.json merged with notes.md)
+- [ ] `PATCH /api/jobs/{id}` — writable: `status`, `date_applied`, `notes` only; reject read-only fields
+- [ ] CSRF: reject when `Origin` present and doesn't match `localhost:{port}`; require `Content-Type: application/json` on POST/PATCH
 
-### Frontend (`static/index.html`)
-- [ ] Create single HTML file with Alpine.js and Tailwind (CDN)
-- [ ] Job URL input field with "Generate" button
-- [ ] Optional: textarea for pasting job text directly (for JS-heavy sites)
-- [ ] Display generated text in read-only text box
-- [ ] Show file paths and token usage after generation
-- [ ] Job list view with status badges (draft, applied, interviewing, offer, rejected)
-- [ ] Filtering and sorting by status, company, date
-- [ ] Loading states and error handling UI
+### Frontend (`cmd/web/index.html`)
+- [ ] Single HTML file: Alpine.js + Tailwind + DaisyUI (all CDN)
+- [ ] Job URL input + textarea for raw text paste + "Generate" button
+- [ ] Generated text display with file paths and token usage
+- [ ] Job list with status badges, filtering, sorting
+- [ ] Loading spinner with timeout-specific error message
 
 ---
 
 ## Future / Out of Scope for MVP1
-- [ ] Markdown support for resume/cover letter templates
+- [ ] Markdown support for templates
 - [ ] PDF generation via Pandoc
-- [ ] Keyword extraction and analysis dashboard
+- [ ] Keyword extraction dashboard
 - [ ] Multiple resume templates
-- [ ] Batch processing multiple URLs
-- [ ] Integration with job boards APIs (LinkedIn, Indeed)
+- [ ] Batch URL processing
+- [ ] Job board API integration (LinkedIn, Indeed)
