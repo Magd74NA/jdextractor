@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"jdextractor"
+	"jdextract/jdextract"
 )
 
 func main() {
 	fmt.Println("Hello World!")
-	jdextractor.CheckWiring()
+	jdextract.CheckWiring()
 }
