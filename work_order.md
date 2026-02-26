@@ -32,13 +32,12 @@
 
 ## Phase 3: Generation Pipeline
 
-- [ ] `generate.go`: `slug()` — normalizes company/role strings for folder names ("Acme & Co." → "acme-co"); returns `"unknown"` when sanitized result is empty
-- [ ] `generate.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
-- [ ] `generate.go`: implement `Process()` following workflow in design.md section 5
-- [ ] `generate.go`: all paths run through `Parse()` → TOON serialization (`toon-go`) → LLM prompt; TOON encoding is the last-mile step before the LLM call, not a parse.go concern
-- [ ] `generate.go`: accept `context.Context` throughout (web callers set 300s timeout)
-- [ ] `generate.go`: atomic write for `job.json` (write `.tmp`, then `os.Rename`)
-- [ ] `generate.go`: on partial failure, leave folder on disk; error if folder already exists on re-run
+- [ ] `storage.go`: `slug()` — normalizes company/role strings for folder names ("Acme & Co." → "acme-co"); returns `"unknown"` when sanitized result is empty
+- [ ] `storage.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
+- [ ] `storage.go`: implement `(a *App) Process(ctx, input)` — fetch/read → parse → load templates → `GenerateAll` → write files; no LLM logic in storage.go
+- [ ] `storage.go`: atomic write for `job.json` (write `.tmp`, then `os.Rename`)
+- [ ] `storage.go`: on partial failure, leave folder on disk; error if folder already exists on re-run
+- [ ] `generate.go`: pure LLM orchestration only — no filesystem access; seam with storage.go is `[]JobDescriptionNode` + plain strings in, plain strings out
 
 ---
 

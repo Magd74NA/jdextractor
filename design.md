@@ -26,10 +26,11 @@ jdextract/
 └── jdextract/               # Core package (importable library)
     ├── app.go               # Central App struct
     ├── config.go            # JSON config loading and file creation
-    ├── fetch.go             # Hybrid HTTP fetch with fallback strategies
-    ├── parse.go             # HTML parsing (company/role + slug)
+    ├── fetch.go             # HTTP fetch via r.jina.ai; exponential backoff on 429
+    ├── parse.go             # Line-level AST classifier; returns []JobDescriptionNode
     ├── llm.go               # DeepSeek HTTP client, retry logic
-    ├── generate.go          # Orchestration: fetch -> parse -> LLM -> save
+    ├── generate.go          # LLM orchestration: TOON encode → prompt → GenerateAll
+    ├── storage.go           # Filesystem/job management: slug, structs, Process()
     └── web.go               # net/http server; accepts fs.FS from caller
 ```
 
@@ -155,7 +156,7 @@ func InvokeDeepseekApi(ctx context.Context, apiKey string, c *http.Client, backo
 ```
 
 ### `Generator` (generate.go)
-All business logic lives here: TOON serialization, prompt construction, `GenerateAll`.
+Pure LLM orchestration — no filesystem access. Contains the prompt, TOON wrapper, and `GenerateAll`.
 
 *   **TOON encoding:** `[]JobDescriptionNode` is wrapped in `jobDescriptionPayload{Nodes: nodes}` and serialized via `toon.MarshalString` inside `GenerateAll` — compact tabular format, token-efficient.
 *   **Batched prompt:** Single LLM call returns company, role, resume, cover letter (optional), and a match score. Uses `response_format: {"type": "json_object"}`. Response decoded into a typed inline struct — no defensive map needed.
@@ -184,7 +185,8 @@ func GenerateAll(
 ) (company, role, resume string, cover *string, score, tokensUsed int, err error)
 ```
 
-### `Process` pipeline (generate.go, continued)
+### `Storage` (storage.go)
+All filesystem and job-management concerns. No LLM logic — calls `GenerateAll` as a black box.
 
 ```go
 // slug normalizes s for use in folder names ("Acme & Co." -> "acme-co").
@@ -195,6 +197,17 @@ type JobInput struct {
     URL       string // mutually exclusive
     LocalFile string // mutually exclusive
     RawText   string // mutually exclusive (web UI paste path)
+}
+
+type JobMetadata struct {
+    ID          string     `json:"id"`
+    Company     string     `json:"company"`
+    Role        string     `json:"role"`
+    Status      string     `json:"status"`
+    DateCreated time.Time  `json:"date_created"`
+    DateApplied *time.Time `json:"date_applied"`
+    URL         string     `json:"url"`
+    TokensUsed  int        `json:"tokens_used"`
 }
 
 type JobResult struct {
@@ -217,16 +230,15 @@ func (a *App) Process(ctx context.Context, input JobInput) (*JobResult, error)
    - LocalFile: read file from disk
    - RawText: use directly
 3. Parse: `Parse()` → `[]JobDescriptionNode` (typed, filtered AST)
-4. Serialize AST to TOON via `toon-go` — this is the job description payload sent to the LLM
-5. Extract company & role: LLM extraction from TOON payload
+4. Load templates (`resume.txt` required; `cover.txt` optional)
+5. Call `GenerateAll()` — returns company, role, resume, cover, score, tokensUsed
 6. Apply `slug()` to company and role
 7. Generate UUID v4 (`crypto/rand`)
 8. Generate folder hash suffix: first 4 hex chars of SHA-256 of the source (URL string, absolute file path, or raw text)
 9. Create run folder `<exe_dir>/data/jobs/YYYY-MM-DD_company_role_hash/`
-10. Save `job_raw.txt`
-11. Call LLM (resume + optional cover letter, TOON job payload)
-12. Write output files (`resume_custom.txt`, `cover_letter.txt`)
-13. Write `job.json` (atomic: write to `.tmp`, then `os.Rename`)
+10. Write `job_raw.txt`
+11. Write output files (`resume_custom.txt`, `cover_letter.txt`)
+12. Write `job.json` atomically (write to `.tmp`, then `os.Rename`)
 
 **Failure behavior:** On partial failure after folder creation, the folder is left on disk for inspection. Re-running against the same source errors if the folder already exists (user must delete manually). When invoked via the web API, `Process()` receives a context with `context.WithTimeout` (default 300s).
 
