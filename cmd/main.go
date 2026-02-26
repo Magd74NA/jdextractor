@@ -45,7 +45,7 @@ func main() {
 	}
 	app.Client = *client
 
-	raw, err := os.ReadFile("test_jd.md")
+	raw, err := os.ReadFile(filepath.Join(app.Paths.Root, "test_jd.md"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read test_jd.md: %s\n", err)
 		os.Exit(1)
