@@ -128,7 +128,7 @@ All URL fetching goes through `https://r.jina.ai/{fullURL}`, which handles both 
 
 **Safety cap:** 100KB response limit.
 
-**Errors:** HTTP 429 returns `ErrJinaRateLimited` (suggests wait + retry). All other failures return the error directly; user can fall back to `--local`.
+**Errors:** HTTP 429 is handled internally with exponential backoff and retry. `FetchJobDescription` accepts a `context.Context` as its first parameter so the backoff loop can be interrupted by the caller's timeout (e.g. the 300s web deadline) or Ctrl+C. All other failures return the error directly; user can fall back to `--local`.
 
 ### `Parse` (parse.go)
 Extracts company/role from HTML without LLM (saves tokens and latency):

@@ -12,7 +12,7 @@
 
 ### Fetching
 - [ ] `fetch.go`: fetch via `r.jina.ai/{url}`; 100KB response cap
-- [ ] `fetch.go`: `ErrJinaRateLimited` on HTTP 429; all other failures return error directly
+- [ ] `fetch.go`: exponential backoff retry loop on HTTP 429, handled internally within `FetchJobDescription`; accepts `context.Context` to allow cancellation; all other failures return error directly
 
 ### Parsing
 - [ ] `parse.go`: extract company/role from `<title>` and `<h1>` via `golang.org/x/net/html`
