@@ -7,8 +7,12 @@ import (
 	"net/http"
 	"strings"
 
-	_ "github.com/toon-format/toon-go"
+	toon "github.com/toon-format/toon-go"
 )
+
+type jobDescriptionPayload struct {
+	Nodes []JobDescriptionNode `toon:"nodes"`
+}
 
 const systemPrompt = `You are a professional resume writer and career coach.
 You will receive a job description in TOON format, a base resume, and optionally a base cover letter.
@@ -29,13 +33,18 @@ func GenerateAll(
 	apiKey string,
 	model string,
 	c *http.Client,
-	jobText string,
+	nodes []JobDescriptionNode,
 	baseResume string,
 	baseCover *string,
 ) (company, role, resume string, cover *string, tokensUsed int, err error) {
+	jobTOON, err := toon.MarshalString(jobDescriptionPayload{Nodes: nodes})
+	if err != nil {
+		return "", "", "", nil, 0, fmt.Errorf("toon encode: %w", err)
+	}
+
 	var sb strings.Builder
 	sb.WriteString("JOB DESCRIPTION:\n")
-	sb.WriteString(jobText)
+	sb.WriteString(jobTOON)
 	sb.WriteString("\n\nBASE RESUME:\n")
 	sb.WriteString(baseResume)
 	if baseCover != nil {
@@ -71,7 +80,7 @@ func GenerateAll(
 		return "", "", "", nil, 0, fmt.Errorf("api returned no choices")
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(apiResp.Choices[0].Message.Content), &result); err != nil {
 		return "", "", "", nil, 0, fmt.Errorf("decode llm json output: %w", err)
 	}
