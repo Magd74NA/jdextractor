@@ -36,9 +36,8 @@
 - [x] `storage.go`: pure FS primitives — `slugify()`, `createApplicationDirectory()`, `fetchResume()`, `fetchCover()`; no orchestration logic
 - [x] `generate.go`: pure LLM orchestration only — no filesystem access; seam with storage.go is `[]JobDescriptionNode` + plain strings in, plain strings out
 - [x] `process.go`: `(a *App) Process(ctx, nodes)` — LLM-first pipeline (load templates → `GenerateAll` → create dir → write files); `applicationMeta` struct written as `meta.json`
-- [ ] `storage.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
-- [ ] `process.go`: expand `Process(ctx, input JobInput)` — validate → fetch/read → parse → load templates → `GenerateAll` → filesystem; no filesystem writes until `GenerateAll` succeeds
-- [ ] `storage.go`: folder name: `YYYY-MM-DD_company-slug_role-slug_hash` where hash = first 4 hex chars of SHA-256 of the source (URL / absolute file path / raw text); error on `ErrExist` (same source already processed)
+- [ ] `process.go`: expand `Process(ctx, rawText string)` — parse → load templates → `GenerateAll` → create dir → write files; source routing (URL fetch / file read / paste) is a CLI concern, not a library concern
+- [ ] `storage.go`: folder name: `YYYY-MM-DD_company-slug_role-slug_hash` where hash = first 4 hex chars of SHA-256 of `rawText`; error on `ErrExist` (same content already processed)
 - [ ] `process.go`: write files sequentially after folder creation: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json` atomically (`.tmp` → `os.Rename`)
 
 ---
