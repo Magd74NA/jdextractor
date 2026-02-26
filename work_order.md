@@ -39,8 +39,8 @@
 - [x] `storage.go`: `currentDate()` — returns `YYYY-MM-DD` via `time.Now().Format`
 - [x] `storage.go`: `slugify()` uses `currentDate()` as prefix; current format: `YYYY-MM-DD-{rand8}-{title-slug}`
 - [x] `process.go`: `applicationMeta` has `date` field; `currentDate()` called and stored in metadata
-- [ ] `storage.go`: complete folder naming — change `slugify(nodes)` to `slugify(company, role string)`; replace `{title-slug}` with `{company-slug}_{role-slug}`; keep `{rand8}` for uniqueness (every run is a new folder); final format: `YYYY-MM-DD_{company-slug}_{role-slug}_{rand8}`; `ErrExist` collision fallback (append `col`) kept as defensive last-resort
-- [ ] `process.go`: pass `company`, `role` into `slugify`; rename output files to `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json`
+- [x] `storage.go`: folder naming — `slugify(nodes)` extracts title from AST; format: `YYYY-MM-DD-{rand8}-{title-slug}`; `ErrExist` collision fallback appends `col`; every run produces a unique folder
+- [x] `process.go`: writes `resume.txt`, `cover.txt` (if cover), `meta.json`; `applicationMeta` written as JSON with company/role/score/tokens/date
 
 ---
 
