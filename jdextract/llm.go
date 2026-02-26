@@ -18,10 +18,9 @@ type deepseekMessage struct {
 }
 
 type deepseekRequest struct {
-	Model          string            `json:"model"`
-	Messages       []deepseekMessage `json:"messages"`
-	ResponseFormat map[string]string `json:"response_format"`
-	Stream         bool              `json:"stream"`
+	Model    string            `json:"model"`
+	Messages []deepseekMessage `json:"messages"`
+	Stream   bool              `json:"stream"`
 }
 
 type deepseekResponse struct {
