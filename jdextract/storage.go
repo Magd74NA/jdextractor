@@ -2,6 +2,7 @@ package jdextract
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -46,13 +47,13 @@ func createApplicationDirectory(slug string, a *App) error {
 	dirName := filepath.Join(a.Paths.Jobs, slug)
 	err := os.Mkdir(dirName, 0755)
 	if err != nil {
-		//	if errors.Is(err, os.ErrExist) {
-		//		dirName = dirName + "col"
-		//		err = os.Mkdir(dirName, 0755)
-		//		if err != nil {
-		//			return err
-		//		}
-		//	}
+		if errors.Is(err, os.ErrExist) {
+			dirName = dirName + "col"
+			err = os.Mkdir(dirName, 0755)
+			if err != nil {
+				return err
+			}
+		}
 		return err
 	}
 	return nil

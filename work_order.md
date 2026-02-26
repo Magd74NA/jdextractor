@@ -39,8 +39,8 @@
 - [x] `storage.go`: `currentDate()` — returns `YYYY-MM-DD` via `time.Now().Format`
 - [x] `storage.go`: `slugify()` uses `currentDate()` as prefix; current format: `YYYY-MM-DD-{rand8}-{title-slug}`
 - [x] `process.go`: `applicationMeta` has `date` field; `currentDate()` called and stored in metadata
-- [ ] `storage.go`: complete folder naming — change `slugify(nodes)` to `slugify(company, role, rawText string)`; replace `{rand8}` midfix with first 4 hex chars of SHA-256 of `rawText`; replace `{title-slug}` with `{company-slug}_{role-slug}`; final format: `YYYY-MM-DD_{company-slug}_{role-slug}_{hash}`; error on `ErrExist`
-- [ ] `process.go`: pass `company`, `role`, `rawText` into `slugify`; write files: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json` atomically (`.tmp` → `os.Rename`)
+- [ ] `storage.go`: complete folder naming — change `slugify(nodes)` to `slugify(company, role string)`; replace `{title-slug}` with `{company-slug}_{role-slug}`; keep `{rand8}` for uniqueness (every run is a new folder); final format: `YYYY-MM-DD_{company-slug}_{role-slug}_{rand8}`; `ErrExist` collision fallback (append `col`) kept as defensive last-resort
+- [ ] `process.go`: pass `company`, `role` into `slugify`; rename output files to `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json`
 
 ---
 
