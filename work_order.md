@@ -46,16 +46,15 @@
 
 ## Phase 4: CLI Interface
 
-- [ ] `cmd/main.go`: `flag.NewFlagSet` per subcommand
-- [ ] `cmd/main.go`: root context via `signal.NotifyContext` (os.Interrupt, SIGTERM)
+- [ ] `cmd/main.go`: `flag.NewFlagSet` per subcommand; root context via `signal.NotifyContext(os.Interrupt, SIGTERM)`
 - [ ] `jdextract setup` — initialize portable directory structure and example templates
-- [ ] `jdextract generate <url>` — fetch, generate, save; display paths and token count
-- [ ] `jdextract generate --local <file>` — process saved text file
-- [ ] `jdextract generate --no-cover` — skip cover letter (default: generate if `templates/cover.txt` exists)
-- [ ] `jdextract list` — tabular output via `text/tabwriter`; UUID truncated to 8 chars; skip corrupt `job.json` with warning
-- [ ] `jdextract status <prefix> <status>` — UUID prefix match, validate against `draft|applied|interviewing|offer|rejected`
+- [ ] `jdextract generate <url>` — fetch via jina.ai, process, save; print output dir
+- [ ] `jdextract generate --local <file>` — read local file, process, save; print output dir
+- [ ] `jdextract generate` (stdin) — read piped text from stdin; error with usage hint if stdin is a TTY
+- [ ] Error messages: missing API key; fetch failure prints tip to use `--local`
+- [ ] `jdextract list` — tabular output via `text/tabwriter`; skip corrupt `meta.json` with warning
+- [ ] `jdextract status <prefix> <status>` — folder prefix match, validate against `draft|applied|interviewing|offer|rejected`
 - [ ] `jdextract serve --port <port>` — pass root context into `Serve()` for graceful shutdown (default 8080)
-- [ ] Error messages: missing API key, fetch failure with `--local` hint
 
 ---
 
