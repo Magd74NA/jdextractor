@@ -82,8 +82,8 @@ var (
 
 // JobDescriptionNode is one line of the jina.ai markdown response, classified by type.
 type JobDescriptionNode struct {
-	Content  string `toon:"content"`
-	NodeType string `toon:"type"`
+	Content  string `json:"content"`
+	NodeType string `json:"type"`
 }
 
 // dropAlways lists node types that are always removed by filterNodes.

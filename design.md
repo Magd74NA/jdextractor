@@ -9,7 +9,7 @@ By providing a target Job URL and a base resume text file, the tool uses an LLM 
 *   **Zero Databases:** The filesystem is the database. Every job run creates a structured folder.
 *   **Zero JS Build Steps:** The web UI is a single embedded HTML file using CDN-hosted Alpine.js, Tailwind, and DaisyUI.
 *   **One LLM Dependency:** DeepSeek for all text analysis and generation. `r.jina.ai` is used for all URL fetching; it requires no account or API key.
-*   **One Go Module Dependency:** `github.com/toon-format/toon-go` (vendored). Used to serialize the parsed AST into TOON format before sending to the LLM — compact, token-efficient, structured. All other functionality uses Go stdlib.
+*   **Zero Go Module Dependencies:** All functionality uses Go stdlib only. The AST is serialized to minified JSON via `encoding/json` before sending to the LLM.
 *   **Zero System Dependencies:** No external tools required (no Pandoc, no headless browsers for MVP1).
 *   **Plain Text Output:** All generated files are `.txt` for simplicity.
 *   **Human-in-the-Loop:** The AI generates text. The human reviews and edits the text.
@@ -158,7 +158,7 @@ func InvokeDeepseekApi(ctx context.Context, apiKey string, c *http.Client, backo
 ### `Generator` (generate.go)
 Pure LLM orchestration — no filesystem access. Contains the prompt, TOON wrapper, and `GenerateAll`.
 
-*   **TOON encoding:** `[]JobDescriptionNode` is wrapped in `jobDescriptionPayload{Nodes: nodes}` and serialized via `toon.MarshalString` inside `GenerateAll` — compact tabular format, token-efficient.
+*   **JSON encoding:** `[]JobDescriptionNode` is serialized to minified JSON via `json.Marshal` inside `GenerateAll` and sent as the job description payload.
 *   **Batched prompt:** Single LLM call returns company, role, resume, cover letter (optional), and a match score. Uses `response_format: {"type": "json_object"}`. Response decoded into a typed inline struct — no defensive map needed.
 *   **JSON schema from LLM:**
 ```json

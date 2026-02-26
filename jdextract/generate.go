@@ -6,13 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	toon "github.com/toon-format/toon-go"
 )
-
-type jobDescriptionPayload struct {
-	Nodes []JobDescriptionNode `toon:"nodes"`
-}
 
 const systemPrompt = `You are a professional resume writer and career coach.
 You will receive a job description in TOON format, a base resume, and optionally a base cover letter.
@@ -37,14 +31,14 @@ func GenerateAll(
 	baseResume string,
 	baseCover *string,
 ) (company, role, resume string, cover *string, score, tokensUsed int, err error) {
-	jobTOON, err := toon.MarshalString(jobDescriptionPayload{Nodes: nodes})
+	jobJSON, err := json.Marshal(nodes)
 	if err != nil {
-		return "", "", "", nil, 0, 0, fmt.Errorf("toon encode: %w", err)
+		return "", "", "", nil, 0, 0, fmt.Errorf("json encode: %w", err)
 	}
 
 	var sb strings.Builder
 	sb.WriteString("JOB DESCRIPTION:\n")
-	sb.WriteString(jobTOON)
+	sb.WriteString(string(jobJSON))
 	sb.WriteString("\n\nBASE RESUME:\n")
 	sb.WriteString(baseResume)
 	if baseCover != nil {

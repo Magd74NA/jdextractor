@@ -5,7 +5,7 @@
 ### Setup
 - [x] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
 - [x] ~~Add `golang.org/x/net/html` dependency~~ — dropped; `r.jina.ai` returns markdown, parsed with stdlib `regexp`
-- [x] Add `github.com/toon-format/toon-go` dependency (vendored via `go mod vendor`); used to serialize the parsed AST to TOON format for LLM consumption
+- [x] ~~Add `github.com/toon-format/toon-go` dependency~~ — dropped; AST serialized to minified JSON via `encoding/json`; zero external dependencies
 - [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
 - [x] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
 - [x] `config.go`: parse `<exe_dir>/config/config.json` (JSON); env var override deferred to post-MVP1
@@ -26,7 +26,7 @@
 - [x] `llm.go`: HTTP client for `api.deepseek.com` with auth and error handling | Just reuse App.Client
 - [x] `llm.go`: exponential backoff on HTTP 429; non-429 errors return immediately | `InvokeDeepseekApi(ctx, apiKey, client, backoff, requestBody)` — same recursive pattern as fetch.go
 - [x] `llm.go`: wire format types (`deepseekRequest`, `deepseekResponse`, `deepseekMessage`) — `response_format: {"type": "json_object"}`; no business logic in llm.go
-- [x] `generate.go`: `GenerateAll()` — serializes `[]JobDescriptionNode` to TOON, builds batched prompt, calls `InvokeDeepseekApi`; decodes into typed inline struct; returns `company, role, resume, cover, score, tokensUsed`; `Score` (1–10 match rating) and `Cover` (optional) included in LLM JSON schema `{Result, Resume, Cover, Score}`
+- [x] `generate.go`: `GenerateAll()` — serializes `[]JobDescriptionNode` to minified JSON, builds batched prompt, calls `InvokeDeepseekApi`; decodes into typed inline struct; returns `company, role, resume, cover, score, tokensUsed`; `Score` (1–10 match rating) and `Cover` (optional) included in LLM JSON schema `{Result, Resume, Cover, Score}`
 
 ---
 
