@@ -7,7 +7,7 @@
 - [x] Add `golang.org/x/net/html` dependency
 - [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
 - [x] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
-- [ ] `config.go`: parse `<exe_dir>/config/config.json` (JSON); env var override deferred to post-MVP1
+- [x] `config.go`: parse `<exe_dir>/config/config.json` (JSON); env var override deferred to post-MVP1
 - [x] `config.go`: create config file with `0600` permissions (contains API key); job files use `0644`
 
 ### Fetching
