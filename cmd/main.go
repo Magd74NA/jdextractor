@@ -53,18 +53,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	nodes := jdextract.Parse(string(raw))
-	fmt.Printf("\n\nParsed %d nodes from test_jd.md\n", len(nodes))
+	resumeBytes, err := os.ReadFile(filepath.Join(App.Paths.Templates, "resume.txt"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read resume template: %s\n", err)
+		os.Exit(1)
+	}
 
-	// No cover letter for this test run.
+	var baseCover *string
+	if coverBytes, err := os.ReadFile(filepath.Join(App.Paths.Templates, "cover.txt")); err == nil {
+		s := string(coverBytes)
+		baseCover = &s
+	}
+
+	nodes := jdextract.Parse(string(raw))
+	fmt.Printf("Parsed %d nodes from test_jd.md\n", len(nodes))
+
 	company, role, resume, cover, score, tokens, err := jdextract.GenerateAll(
 		context.Background(),
 		App.Config.DeepSeekApiKey,
 		App.Config.DeepSeekModel,
 		&App.Client,
 		nodes,
-		"[no resume provided — testing parse + LLM pipeline]",
-		nil,
+		string(resumeBytes),
+		baseCover,
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "GenerateAll error: %s\n", err)
