@@ -151,7 +151,13 @@ func Parse(s string) []JobDescriptionNode
 *   **Exponential Backoff:** Retries on HTTP 429. Non-429 errors return immediately.
 
 ```go
-func (l *LLM) GenerateAll(ctx context.Context, jobText, baseResume string, baseCover *string) (
+// InvokeDeepseekApi is the low-level HTTP primitive. Handles auth headers,
+// POST body, and the 429 retry loop. All other failures return immediately.
+func InvokeDeepseekApi(ctx context.Context, apiKey string, c *http.Client, backoff int, requestBody json.RawMessage) (string, error)
+
+// GenerateAll is the high-level call: builds the batched prompt, calls
+// InvokeDeepseekApi, and parses the JSON response into typed fields.
+func GenerateAll(ctx context.Context, apiKey string, c *http.Client, jobText, baseResume string, baseCover *string) (
     resume string,
     cover *string,
     tokensUsed int,

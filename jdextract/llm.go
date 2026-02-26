@@ -12,6 +12,29 @@ import (
 
 const deepseekURL = "https://api.deepseek.com/chat/completions"
 
+type deepseekMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type deepseekRequest struct {
+	Model          string            `json:"model"`
+	Messages       []deepseekMessage `json:"messages"`
+	ResponseFormat map[string]string `json:"response_format"`
+	Stream         bool              `json:"stream"`
+}
+
+type deepseekResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+	Usage struct {
+		TotalTokens int `json:"total_tokens"`
+	} `json:"usage"`
+}
+
 func InvokeDeepseekApi(ctx context.Context, apiKey string, c *http.Client, backoff int, requestBody json.RawMessage) (string, error) {
 	if backoff != 0 {
 		select {

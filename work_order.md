@@ -24,9 +24,9 @@
 ## Phase 2: LLM Integration
 
 - [x] `llm.go`: HTTP client for `api.deepseek.com` with auth and error handling | Just reuse App.Client
-- [ ] `llm.go`: exponential backoff on HTTP 429; non-429 errors return immediately | Reuse same pattern as fetch.go
-- [ ] `llm.go`: batched prompt using `response_format: {"type": "json_object"}`; decode into raw map first, check key existence before struct assignment
-- [ ] `llm.go`: implement `GenerateAll()` — pass `nil` for `baseCover` to skip cover letter (see design.md section 5)
+- [x] `llm.go`: exponential backoff on HTTP 429; non-429 errors return immediately | `InvokeDeepseekApi(ctx, apiKey, client, backoff, requestBody)` — same recursive pattern as fetch.go
+- [x] `llm.go`: wire format types (`deepseekRequest`, `deepseekResponse`, `deepseekMessage`) — `response_format: {"type": "json_object"}`; no business logic in llm.go
+- [x] `generate.go`: `GenerateAll()` — builds prompt, calls `InvokeDeepseekApi`, decodes outer API response then inner LLM JSON defensively via `map[string]interface{}`; `nil` baseCover skips cover letter
 
 ---
 
