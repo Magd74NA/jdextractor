@@ -156,22 +156,31 @@ func InvokeDeepseekApi(ctx context.Context, apiKey string, c *http.Client, backo
 ```
 
 ### `Generator` (generate.go)
-Pure LLM orchestration — no filesystem access. Contains the prompt, TOON wrapper, and `GenerateAll`.
+Pure LLM orchestration — no filesystem access. Contains the system prompt, tag-extraction helpers, and `GenerateAll`.
 
-*   **JSON encoding:** `[]JobDescriptionNode` is serialized to minified JSON via `json.Marshal` inside `GenerateAll` and sent as the job description payload.
-*   **Batched prompt:** Single LLM call returns company, role, resume, cover letter (optional), and a match score. Uses `response_format: {"type": "json_object"}`. Response decoded into a typed inline struct — no defensive map needed.
-*   **JSON schema from LLM:**
-```json
-{
-  "Result":  { "company": "string", "role": "string" },
-  "Resume":  "full tailored resume text",
-  "Cover":   "tailored cover letter — omitted if no base cover provided",
-  "Score":   7
-}
+*   **Job description encoding:** `[]JobDescriptionNode` is serialized to minified JSON via `json.Marshal` and sent as the job description payload. The JSON keys (`"content"`, `"type"`) are set by the struct tags on `JobDescriptionNode`.
+
+*   **Plain text output mode (not JSON mode):** The DeepSeek API supports a `response_format: {"type": "json_object"}` flag that constrains the model to emit valid JSON. This was dropped. Forcing JSON mode is known to degrade output quality — the model has to simultaneously reason about content *and* maintain JSON syntax, which competes for the same generation capacity. Plain text mode lets the model reason freely; we impose structure on the output ourselves via XML-like delimiter tags.
+
+*   **Output format — XML delimiter tags:** The system prompt instructs the model to wrap each output field in a unique tag. Five compiled regexps with `(?s)` (dot-matches-newline) extract each section. Tag-based parsing is robust for this use case because plain text resumes and cover letters will never naturally contain strings like `<resume>`.
+
+```text
+<company>Acme Corp</company>
+<role>Senior Copywriter</role>
+<score>7</score>
+<resume>
+full tailored resume text
+</resume>
+<cover>
+tailored cover letter (only present if base cover was provided)
+</cover>
 ```
-*   **Score:** Integer 1–10 subjective rating of how well the base resume matches the job requirements.
-*   **Optional Cover Letter:** Pass `nil` for `baseCover` to skip. Default: generate if `templates/cover.txt` exists AND `--no-cover` is not set.
-*   **Company/Role Extraction:** Extracted by the LLM from the TOON payload in the same call — no separate fallback prompt.
+
+*   **Validation:** After extraction, `GenerateAll` errors immediately if `company`, `role`, or `resume` are empty, with a diagnostic message showing what was (and wasn't) parsed. This surfaces prompt compliance failures rather than silently writing empty files.
+
+*   **Score:** Integer 1–10 subjective rating of how well the base resume matches the job requirements. Defaults to 0 on parse failure — non-fatal.
+*   **Optional Cover Letter:** Pass `nil` for `baseCover` to skip. `<cover>` tag is omitted from the prompt instruction when no base cover is provided; the regexp only runs when `baseCover != nil`.
+*   **Company/Role Extraction:** Extracted by the LLM from the JSON payload in the same call — no separate fallback prompt.
 
 ```go
 func GenerateAll(
