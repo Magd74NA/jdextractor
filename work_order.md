@@ -18,22 +18,21 @@
 ### Parsing
 - [x] `parse.go`: line-level AST via `buildProtoAST()` — classifies each line into 15 `NodeType` constants (generic → specific); drops noise and long body lines
 - [x] `parse.go`: `filterNodes()` removes always-drop types; `Parse()` returns the filtered `[]JobDescriptionNode`
-- [ ] `parse.go`: `slug()` — returns `"unknown"` when sanitized result is empty
 
 ---
 
 ## Phase 2: LLM Integration
 
-- [ ] `llm.go`: HTTP client for `api.deepseek.com` with auth and error handling
-- [ ] `llm.go`: exponential backoff on HTTP 429; non-429 errors return immediately
+- [x] `llm.go`: HTTP client for `api.deepseek.com` with auth and error handling | Just reuse App.Client
+- [ ] `llm.go`: exponential backoff on HTTP 429; non-429 errors return immediately | Reuse same pattern as fetch.go
 - [ ] `llm.go`: batched prompt using `response_format: {"type": "json_object"}`; decode into raw map first, check key existence before struct assignment
-- [ ] `llm.go`: fallback prompt for company/role extraction (when HTML parsing fails)
 - [ ] `llm.go`: implement `GenerateAll()` — pass `nil` for `baseCover` to skip cover letter (see design.md section 5)
 
 ---
 
 ## Phase 3: Generation Pipeline
 
+- [ ] `generate.go`: `slug()` — normalizes company/role strings for folder names ("Acme & Co." → "acme-co"); returns `"unknown"` when sanitized result is empty
 - [ ] `generate.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
 - [ ] `generate.go`: implement `Process()` following workflow in design.md section 5
 - [ ] `generate.go`: all paths run through `Parse()` → TOON serialization (`toon-go`) → LLM prompt; TOON encoding is the last-mile step before the LLM call, not a parse.go concern

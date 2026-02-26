@@ -142,15 +142,12 @@ func classifyLine(line string) string
 
 // Parse returns the filtered AST: noise removed, long body lines dropped.
 func Parse(s string) []JobDescriptionNode
-
-// slug normalizes s for use in folder names ("Acme & Co." -> "acme-co").
-// Returns "unknown" if the sanitized result is empty.
-func slug(s string) string
 ```
 
 ### `LLM Client` (llm.go)
 *   **Batched Calls:** Combines resume + cover letter into one prompt using `response_format: {"type": "json_object"}` — returns `{"resume": "...", "cover_letter": "..."}`. Eliminates delimiter fragility, cuts API costs ~40%. Parse defensively: decode into raw map first, check key existence before assigning to struct fields.
 *   **Optional Cover Letter:** Pass `nil` for `baseCover` to skip; omits `cover_letter` from response. **Default behavior:** generate cover letter if `templates/cover.txt` exists AND `--no-cover` is not set. No template = no cover letter, silently.
+*   **Company/Role Extraction:** Extracted by the LLM from the TOON payload in the same `GenerateAll()` call — no separate fallback prompt. The AST approach always produces typed, structured nodes regardless of source format.
 *   **Exponential Backoff:** Retries on HTTP 429. Non-429 errors return immediately.
 
 ```go
@@ -165,6 +162,10 @@ func (l *LLM) GenerateAll(ctx context.Context, jobText, baseResume string, baseC
 ### `Generator` (generate.go)
 
 ```go
+// slug normalizes s for use in folder names ("Acme & Co." -> "acme-co").
+// Returns "unknown" if the sanitized result is empty.
+func slug(s string) string
+
 type JobInput struct {
     URL       string // mutually exclusive
     LocalFile string // mutually exclusive
