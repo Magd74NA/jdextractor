@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	DeepSeekApiKey string `json:"deepseek_api_key"`
+	DeepSeekModel  string `json:"deepseek_model"`
 	Port           int    `json:"port"`
 }
 
@@ -15,15 +16,19 @@ func CreateEmptyConfig(path string) error {
 	emptyConfig := `
 	{
 		"deepseek_api_key": "example_key",
-		"port": 8080,
-		"deepseek_model": "reasonerdeepseek-chat"
+		"deepseek_model": "deepseek-chat",
+		"port": 8080
 	}
 	`
-	file, err := os.Create(path)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	file.Write([]byte(emptyConfig))
+
+	_, err = file.Write([]byte(emptyConfig))
+	if err != nil {
+		return err
+	}
 	err = file.Close()
 	if err != nil {
 		return err

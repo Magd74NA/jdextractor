@@ -119,7 +119,7 @@ func (a *App) createExampleTemplates() error
 
 ### `Config` (config.go)
 *   Reads `<exe_dir>/config/config.json` (JSON format). Path provided by `App.Paths.Config`.
-*   Precedence: **env var > config file > default/error**. `DEEPSEEK_MODEL` defaults to `deepseek-chat`.
+*   `DEEPSEEK_MODEL` defaults to `deepseek-chat`. Env var override and precedence rules deferred to post-MVP1.
 *   **Permissions:** Config file created with `0600` (contains API key). Job output files use `0644`.
 
 ### `Fetch` (fetch.go) — Hybrid Strategy
