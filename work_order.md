@@ -26,7 +26,7 @@
 - [x] `llm.go`: HTTP client for `api.deepseek.com` with auth and error handling | Just reuse App.Client
 - [x] `llm.go`: exponential backoff on HTTP 429; non-429 errors return immediately | `InvokeDeepseekApi(ctx, apiKey, client, backoff, requestBody)` — same recursive pattern as fetch.go
 - [x] `llm.go`: wire format types (`deepseekRequest`, `deepseekResponse`, `deepseekMessage`) — `response_format: {"type": "json_object"}`; no business logic in llm.go
-- [x] `generate.go`: `GenerateAll()` — builds prompt, calls `InvokeDeepseekApi`, decodes outer API response then inner LLM JSON defensively via `map[string]interface{}`; `nil` baseCover skips cover letter
+- [x] `generate.go`: `GenerateAll()` — serializes `[]JobDescriptionNode` to TOON, builds batched prompt, calls `InvokeDeepseekApi`; decodes into typed inline struct; returns `company, role, resume, cover, score, tokensUsed`; `Score` (1–10 match rating) and `Cover` (optional) included in LLM JSON schema `{Result, Resume, Cover, Score}`
 
 ---
 

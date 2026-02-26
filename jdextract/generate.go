@@ -25,7 +25,8 @@ Your tasks:
 Respond with a JSON object with exactly these keys:
 - "Result": object with "company" (string) and "role" (string)
 - "Resume": full tailored resume text (string)
-- "Cover": tailored cover letter (string) — include ONLY if a base cover letter was provided`
+- "Cover": tailored cover letter (string) — include ONLY if a base cover letter was provided
+- "Score": integer 1–10 rating of how well the base resume matches the job requirements (1 = poor fit, 10 = perfect fit); base this on the candidate's existing experience, skills, and background relative to what the role demands`
 
 func GenerateAll(
 	ctx context.Context,
@@ -35,10 +36,10 @@ func GenerateAll(
 	nodes []JobDescriptionNode,
 	baseResume string,
 	baseCover *string,
-) (company, role, resume string, cover *string, tokensUsed int, err error) {
+) (company, role, resume string, cover *string, score, tokensUsed int, err error) {
 	jobTOON, err := toon.MarshalString(jobDescriptionPayload{Nodes: nodes})
 	if err != nil {
-		return "", "", "", nil, 0, fmt.Errorf("toon encode: %w", err)
+		return "", "", "", nil, 0, 0, fmt.Errorf("toon encode: %w", err)
 	}
 
 	var sb strings.Builder
@@ -63,20 +64,20 @@ func GenerateAll(
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", "", "", nil, 0, fmt.Errorf("marshal request: %w", err)
+		return "", "", "", nil, 0, 0, fmt.Errorf("marshal request: %w", err)
 	}
 
 	raw, err := InvokeDeepseekApi(ctx, apiKey, c, 0, json.RawMessage(bodyBytes))
 	if err != nil {
-		return "", "", "", nil, 0, err
+		return "", "", "", nil, 0, 0, err
 	}
 
 	var apiResp deepseekResponse
 	if err := json.Unmarshal([]byte(raw), &apiResp); err != nil {
-		return "", "", "", nil, 0, fmt.Errorf("decode api response: %w", err)
+		return "", "", "", nil, 0, 0, fmt.Errorf("decode api response: %w", err)
 	}
 	if len(apiResp.Choices) == 0 {
-		return "", "", "", nil, 0, fmt.Errorf("api returned no choices")
+		return "", "", "", nil, 0, 0, fmt.Errorf("api returned no choices")
 	}
 
 	var result struct {
@@ -86,17 +87,19 @@ func GenerateAll(
 		} `json:"Result"`
 		Resume string  `json:"Resume"`
 		Cover  *string `json:"Cover"`
+		Score  int     `json:"Score"`
 	}
 	if err := json.Unmarshal([]byte(apiResp.Choices[0].Message.Content), &result); err != nil {
-		return "", "", "", nil, 0, fmt.Errorf("decode llm json output: %w", err)
+		return "", "", "", nil, 0, 0, fmt.Errorf("decode llm json output: %w", err)
 	}
 
 	company = result.Result.Company
 	role = result.Result.Role
 	resume = result.Resume
+	score = result.Score
 	if baseCover != nil {
 		cover = result.Cover
 	}
 
-	return company, role, resume, cover, apiResp.Usage.TotalTokens, nil
+	return company, role, resume, cover, score, apiResp.Usage.TotalTokens, nil
 }

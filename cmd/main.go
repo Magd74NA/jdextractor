@@ -57,7 +57,7 @@ func main() {
 	fmt.Printf("Parsed %d nodes from test_jd.md\n", len(nodes))
 
 	// No cover letter for this test run.
-	company, role, resume, cover, tokens, err := jdextract.GenerateAll(
+	company, role, resume, cover, score, tokens, err := jdextract.GenerateAll(
 		context.Background(),
 		App.Config.DeepSeekApiKey,
 		App.Config.DeepSeekModel,
@@ -74,6 +74,7 @@ func main() {
 	fmt.Printf("\n--- RESULT ---\n")
 	fmt.Printf("Company:     %s\n", company)
 	fmt.Printf("Role:        %s\n", role)
+	fmt.Printf("Match score: %d/10\n", score)
 	fmt.Printf("Tokens used: %d\n", tokens)
 	fmt.Printf("\n--- RESUME ---\n%s\n", resume)
 	if cover != nil {

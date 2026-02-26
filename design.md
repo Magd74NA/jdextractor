@@ -145,27 +145,46 @@ func Parse(s string) []JobDescriptionNode
 ```
 
 ### `LLM Client` (llm.go)
-*   **Batched Calls:** Combines resume + cover letter into one prompt using `response_format: {"type": "json_object"}` — returns `{"resume": "...", "cover_letter": "..."}`. Eliminates delimiter fragility, cuts API costs ~40%. Parse defensively: decode into raw map first, check key existence before assigning to struct fields.
-*   **Optional Cover Letter:** Pass `nil` for `baseCover` to skip; omits `cover_letter` from response. **Default behavior:** generate cover letter if `templates/cover.txt` exists AND `--no-cover` is not set. No template = no cover letter, silently.
-*   **Company/Role Extraction:** Extracted by the LLM from the TOON payload in the same `GenerateAll()` call — no separate fallback prompt. The AST approach always produces typed, structured nodes regardless of source format.
-*   **Exponential Backoff:** Retries on HTTP 429. Non-429 errors return immediately.
+Pure HTTP interface — no prompt text or business logic. Contains the wire-format types and `InvokeDeepseekApi`.
+
+*   **Wire types:** `deepseekRequest`, `deepseekResponse`, `deepseekMessage` (unexported). Request uses `response_format: {"type": "json_object"}` and `stream: false`.
+*   **Exponential Backoff:** `InvokeDeepseekApi` retries on HTTP 429 recursively. Non-429 errors return immediately.
 
 ```go
-// InvokeDeepseekApi is the low-level HTTP primitive. Handles auth headers,
-// POST body, and the 429 retry loop. All other failures return immediately.
 func InvokeDeepseekApi(ctx context.Context, apiKey string, c *http.Client, backoff int, requestBody json.RawMessage) (string, error)
-
-// GenerateAll is the high-level call: builds the batched prompt, calls
-// InvokeDeepseekApi, and parses the JSON response into typed fields.
-func GenerateAll(ctx context.Context, apiKey string, c *http.Client, jobText, baseResume string, baseCover *string) (
-    resume string,
-    cover *string,
-    tokensUsed int,
-    err error,
-)
 ```
 
 ### `Generator` (generate.go)
+All business logic lives here: TOON serialization, prompt construction, `GenerateAll`.
+
+*   **TOON encoding:** `[]JobDescriptionNode` is wrapped in `jobDescriptionPayload{Nodes: nodes}` and serialized via `toon.MarshalString` inside `GenerateAll` — compact tabular format, token-efficient.
+*   **Batched prompt:** Single LLM call returns company, role, resume, cover letter (optional), and a match score. Uses `response_format: {"type": "json_object"}`. Response decoded into a typed inline struct — no defensive map needed.
+*   **JSON schema from LLM:**
+```json
+{
+  "Result":  { "company": "string", "role": "string" },
+  "Resume":  "full tailored resume text",
+  "Cover":   "tailored cover letter — omitted if no base cover provided",
+  "Score":   7
+}
+```
+*   **Score:** Integer 1–10 subjective rating of how well the base resume matches the job requirements.
+*   **Optional Cover Letter:** Pass `nil` for `baseCover` to skip. Default: generate if `templates/cover.txt` exists AND `--no-cover` is not set.
+*   **Company/Role Extraction:** Extracted by the LLM from the TOON payload in the same call — no separate fallback prompt.
+
+```go
+func GenerateAll(
+    ctx        context.Context,
+    apiKey     string,
+    model      string,
+    c          *http.Client,
+    nodes      []JobDescriptionNode,
+    baseResume string,
+    baseCover  *string,
+) (company, role, resume string, cover *string, score, tokensUsed int, err error)
+```
+
+### `Process` pipeline (generate.go, continued)
 
 ```go
 // slug normalizes s for use in folder names ("Acme & Co." -> "acme-co").
