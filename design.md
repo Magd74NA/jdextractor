@@ -9,7 +9,7 @@ By providing a target Job URL and a base resume text file, the tool uses an LLM 
 *   **Zero Databases:** The filesystem is the database. Every job run creates a structured folder.
 *   **Zero JS Build Steps:** The web UI is a single embedded HTML file using CDN-hosted Alpine.js, Tailwind, and DaisyUI.
 *   **One LLM Dependency:** DeepSeek for all text analysis and generation. `r.jina.ai` is used for all URL fetching; it requires no account or API key.
-*   **One Go Module Dependency:** `golang.org/x/net/html` for HTML parsing. All other functionality uses Go stdlib.
+*   **Zero Go Module Dependencies:** All functionality uses Go stdlib. `r.jina.ai` returns markdown, so company/role extraction uses `regexp` rather than an HTML parser.
 *   **Zero System Dependencies:** No external tools required (no Pandoc, no headless browsers for MVP1).
 *   **Plain Text Output:** All generated files are `.txt` for simplicity.
 *   **Human-in-the-Loop:** The AI generates text. The human reviews and edits the text.
@@ -131,10 +131,9 @@ All URL fetching goes through `https://r.jina.ai/{fullURL}`, which handles both 
 **Errors:** HTTP 429 is handled internally with exponential backoff and retry. `FetchJobDescription` accepts a `context.Context` as its first parameter so the backoff loop can be interrupted by the caller's timeout (e.g. the 300s web deadline) or Ctrl+C. All other failures return the error directly; user can fall back to `--local`.
 
 ### `Parse` (parse.go)
-Extracts company/role from HTML without LLM (saves tokens and latency):
-*   Parses `<title>` and `<h1>` tags via `golang.org/x/net/html`
-*   Regex patterns for common job board formats (Greenhouse, Lever, Workday)
-*   Falls back to LLM only if HTML parsing fails completely
+Extracts company/role from the markdown returned by `r.jina.ai` without LLM (saves tokens and latency):
+*   Regex patterns on markdown headings (`#`, `##`) for common job board formats (Greenhouse, Lever, Workday)
+*   Falls back to LLM only if regex extraction fails completely
 
 ```go
 // slug normalizes s for use in folder names ("Acme & Co." -> "acme-co").

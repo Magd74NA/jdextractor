@@ -4,19 +4,18 @@
 
 ### Setup
 - [x] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
-- [x] Add `golang.org/x/net/html` dependency
+- [x] ~~Add `golang.org/x/net/html` dependency~~ — dropped; `r.jina.ai` returns markdown, parsed with stdlib `regexp`
 - [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
 - [x] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
 - [x] `config.go`: parse `<exe_dir>/config/config.json` (JSON); env var override deferred to post-MVP1
 - [x] `config.go`: create config file with `0600` permissions (contains API key); job files use `0644`
 
 ### Fetching
-- [ ] `fetch.go`: fetch via `r.jina.ai/{url}`; 100KB response cap
-- [ ] `fetch.go`: exponential backoff retry loop on HTTP 429, handled internally within `FetchJobDescription`; accepts `context.Context` to allow cancellation; all other failures return error directly
+- [x] `fetch.go`: fetch via `r.jina.ai/{url}`; 100KB response cap
+- [x] `fetch.go`: exponential backoff retry loop on HTTP 429, handled internally within `FetchJobDescription`; accepts `context.Context` to allow cancellation; all other failures return error directly
 
 ### Parsing
-- [ ] `parse.go`: extract company/role from `<title>` and `<h1>` via `golang.org/x/net/html`
-- [ ] `parse.go`: regex patterns for common job board formats
+- [ ] `parse.go`: extract company/role from markdown headings (`#`, `##`) via stdlib `regexp`; patterns for common job board formats (Greenhouse, Lever, Workday)
 - [ ] `parse.go`: `slug()` — returns `"unknown"` when sanitized result is empty
 
 ---
