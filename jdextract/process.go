@@ -42,7 +42,7 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 		return "", fmt.Errorf("generate: %w", err)
 	}
 
-	slug := slugify(nodes)
+	slug := slugify(nodes) //NEED TO UPDATE TO NOT USE NODES MAYBE?
 	if err := createApplicationDirectory(slug, a); err != nil {
 		return "", fmt.Errorf("create directory: %w", err)
 	}

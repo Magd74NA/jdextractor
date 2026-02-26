@@ -6,7 +6,7 @@
 - [x] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
 - [x] ~~Add `golang.org/x/net/html` dependency~~ — dropped; `r.jina.ai` returns markdown, parsed with stdlib `regexp`
 - [x] ~~Add `github.com/toon-format/toon-go` dependency~~ — dropped; AST serialized to minified JSON via `encoding/json`; zero external dependencies
-- [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
+- [x] `app.go`: `getPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
 - [x] `app.go`: `NewApp()` — constructor only; types `App` and `PortablePaths`
 - [x] `setup.go`: `Setup()` and `createExampleTemplates()` — creates `templates/`, `data/jobs/`, example templates; split from `app.go`
 - [x] `config.go`: parse `<exe_dir>/config/config.json` (JSON); env var override deferred to post-MVP1
@@ -63,8 +63,8 @@
 ### Backend (`web.go`)
 - [ ] `Serve(ctx, port, ui)` — accepts context for graceful shutdown via `http.Server.Shutdown(ctx)`
 - [ ] `POST /api/process` — wraps `Process()` with `context.WithTimeout` (300s)
-- [ ] `GET /api/jobs` — list with filtering/sorting; tolerates corrupt `job.json` (log + skip)
-- [ ] `GET /api/jobs/{id}` — returns `JobDetail` (job.json merged with notes.md)
+- [ ] `GET /api/jobs` — list with filtering/sorting; tolerates corrupt `meta.json` (log + skip)
+- [ ] `GET /api/jobs/{id}` — returns job metadata from `meta.json`; extended metadata type TBD for Phase 5
 - [ ] `PATCH /api/jobs/{id}` — writable: `status`, `date_applied`, `notes` only; reject read-only fields
 - [ ] CSRF: reject when `Origin` present and doesn't match `localhost:{port}`; require `Content-Type: application/json` on POST/PATCH
 

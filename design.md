@@ -24,14 +24,16 @@ jdextract/
 │   └── web/
 │       └── index.html       # Embedded UI (HTML/Alpine/Tailwind/DaisyUI)
 └── jdextract/               # Core package (importable library)
-    ├── app.go               # Central App struct
+    ├── app.go               # Central App struct, PortablePaths, NewApp()
+    ├── setup.go             # Setup() and createExampleTemplates()
     ├── config.go            # JSON config loading and file creation
     ├── fetch.go             # HTTP fetch via r.jina.ai; exponential backoff on 429
     ├── parse.go             # Line-level AST classifier; returns []JobDescriptionNode
     ├── llm.go               # DeepSeek HTTP client, retry logic
-    ├── generate.go          # LLM orchestration: TOON encode → prompt → GenerateAll
-    ├── storage.go           # Filesystem/job management: slug, structs, Process()
-    └── web.go               # net/http server; accepts fs.FS from caller
+    ├── generate.go          # LLM orchestration: JSON encode → prompt → GenerateAll
+    ├── storage.go           # FS primitives: slugify, createApplicationDirectory, fetchResume, fetchCover
+    ├── process.go           # Orchestration: (a *App) Process(), applicationMeta struct
+    └── web.go               # (Phase 5, not yet created) net/http server; accepts fs.FS from caller
 ```
 
 The `//go:embed web` directive in `cmd/main.go` embeds the UI. `fs.Sub(webFiles, "web")` strips the prefix before passing to `App.Serve()`.
@@ -51,42 +53,28 @@ Every run creates a "Run Folder" under the data directory, forming a searchable 
 │       └── cover.txt         # The user's base cover letter (optional)
 └── data/
     └── jobs/
-        └── 2026-02-24_acme-corp_copywriter_a7x9/    <-- "Run Folder"
-            ├── job.json                          # Structured metadata
-            ├── job_raw.txt                       # Scraped webpage content
-            ├── resume_custom.txt                 # AI-tailored resume
-            ├── cover_letter.txt                  # AI-drafted cover letter (optional)
-            └── notes.md                          # Freeform user notes
+        └── 2026-02-24-a7x9k3m2-intermediate-copywriter/    <-- "Run Folder"
+            ├── meta.json        # Structured metadata (applicationMeta)
+            ├── resume.txt       # AI-tailored resume
+            └── cover.txt        # AI-drafted cover letter (if base cover provided)
 ```
 
-### Job Metadata (`job.json`)
+### Job Metadata (`meta.json`)
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
   "company": "Acme Corp",
-  "role": "Copywriter",
-  "status": "draft",
-  "date_created": "2026-02-24T14:30:00Z",
-  "date_applied": null,
-  "url": "https://acme.com/jobs/123",
-  "tokens_used": 2847
+  "role": "Intermediate Copywriter",
+  "score": 7,
+  "tokens": 2847,
+  "date": "2026-02-24"
 }
 ```
-- **`id`**: UUID v4 via `crypto/rand`. CLI lookup uses **UUID prefix matching** (mirrors git short SHA). Error on zero or multiple matches.
-- **`status`**: One of `draft`, `applied`, `interviewing`, `offer`, `rejected`
+- **`company`**, **`role`**: Extracted by the LLM from the job description.
+- **`score`**: Integer 1–10 subjective fit rating from the LLM. Defaults to 0 on parse failure.
+- **`tokens`**: Total tokens used for the LLM call.
+- **`date`**: `YYYY-MM-DD` from `currentDate()`.
 
-### User Notes (`notes.md`)
-Sidecar file alongside `job.json` — keeps metadata machine-readable and notes human-editable. Created empty on first run; absence is fine.
-
-### API Response (`JobDetail`)
-`GET /api/jobs/{id}` returns a merged view of `job.json` + `notes.md`:
-
-```go
-type JobDetail struct {
-    JobMetadata        // all job.json fields
-    Notes       string // contents of notes.md; empty if absent
-}
-```
+Richer metadata (status tracking, URL storage, UUID-based IDs, notes sidecar) is deferred to Phase 4/5.
 
 ## 5. System Components (The `jdextract` package)
 
@@ -105,12 +93,13 @@ type PortablePaths struct {
 type App struct {
     Paths  PortablePaths
     Config Config
+    Client http.Client
 }
 
 func getPortablePaths() (PortablePaths, error)
 func NewApp() (*App, error)
-func (a *App) Setup() error
-func (a *App) createExampleTemplates() error
+func (a *App) Setup() error              // in setup.go
+func (a *App) createExampleTemplates() error  // in setup.go
 ```
 
 `getPortablePaths()` resolves the executable's location (following symlinks), then derives `config`, `templates/`, and `data/` paths relative to it. On macOS inside a `.app` bundle, it walks up to the directory containing the `.app`. The caller (`main.go`) creates the root context via `signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)` and passes it into App methods. App does not handle signals itself.
@@ -121,7 +110,7 @@ func (a *App) createExampleTemplates() error
 
 ### `Config` (config.go)
 *   Reads `<exe_dir>/config/config.json` (JSON format). Path provided by `App.Paths.Config`.
-*   `DEEPSEEK_MODEL` defaults to `deepseek-chat`. Env var override and precedence rules deferred to post-MVP1.
+*   Config struct fields: `DeepSeekApiKey` (string), `DeepSeekModel` (string, defaults to `"deepseek-chat"`), `Port` (int). Env var override deferred to post-MVP1.
 *   **Permissions:** Config file created with `0600` (contains API key). Job output files use `0644`.
 
 ### `Fetch` (fetch.go)
@@ -134,7 +123,7 @@ All URL fetching goes through `https://r.jina.ai/{fullURL}`, which handles both 
 ### `Parse` (parse.go)
 Converts the markdown returned by `r.jina.ai` into a typed, filtered line-level AST.
 
-Each non-empty line is classified as one of 15 `NodeType` constants ordered from most generic (`body`) to most specific (`jina_title`). Noise types (`jina_marker`, `setext_underline`, `nav_link`) are stripped; long low-information body lines (> 300 chars) are dropped to preserve LLM context window. Returns `[]JobDescriptionNode` — serialization to TOON is handled downstream in `generate.go`.
+Each non-empty line is classified as one of 15 `NodeType` constants ordered from most generic (`body`) to most specific (`jina_title`). Noise types (`jina_marker`, `setext_underline`, `nav_link`) are stripped; long low-information body lines (> 300 chars) are dropped to preserve LLM context window. Returns `[]JobDescriptionNode` — serialization to JSON is handled downstream in `generate.go`.
 
 ```go
 // classifyLine returns the most specific NodeType for a single non-empty line,
@@ -148,7 +137,7 @@ func Parse(s string) []JobDescriptionNode
 ### `LLM Client` (llm.go)
 Pure HTTP interface — no prompt text or business logic. Contains the wire-format types and `InvokeDeepseekApi`.
 
-*   **Wire types:** `deepseekRequest`, `deepseekResponse`, `deepseekMessage` (unexported). Request uses `response_format: {"type": "json_object"}` and `stream: false`.
+*   **Wire types:** `deepseekRequest`, `deepseekResponse`, `deepseekMessage` (unexported). Request uses `stream: false`. No `response_format` field — plain text mode (see Generator section).
 *   **Exponential Backoff:** `InvokeDeepseekApi` retries on HTTP 429 recursively. Non-429 errors return immediately.
 
 ```go
@@ -195,59 +184,50 @@ func GenerateAll(
 ```
 
 ### `Storage` (storage.go)
-All filesystem and job-management concerns. No LLM logic — calls `GenerateAll` as a black box.
+Pure filesystem primitives. No orchestration logic, no LLM calls.
 
 ```go
-// slugify derives a slug from parsed AST nodes: prefers jina_title, falls back
-// to job_title. Prepends an 8-char random prefix. Returns the bare prefix if
-// no title node is found.
+func currentDate() string  // returns YYYY-MM-DD via time.Now().Format
+
+// slugify derives a folder name from parsed AST nodes: prefers jina_title
+// (with "Title:" prefix stripped), falls back to job_title (with leading
+// #/* stripped). Format: YYYY-MM-DD-{rand8}-{title-slug}.
+// Returns bare date prefix if no title node is found.
 func slugify(nodes []JobDescriptionNode) string
 
-type JobInput struct {
-    URL       string // mutually exclusive
-    LocalFile string // mutually exclusive
-    RawText   string // mutually exclusive (web UI paste path)
+// createApplicationDirectory creates the run folder under App.Paths.Jobs.
+// On os.ErrExist, appends "col" suffix and retries once.
+func createApplicationDirectory(slug string, a *App) error
+
+func fetchResume(a *App) (string, error)  // reads config/templates/resume.txt
+func fetchCover(a *App) (string, error)   // reads config/templates/cover.txt
+```
+
+### `Process` (process.go)
+Orchestrates the full pipeline: parse, load templates, call LLM, create directory, write files. Source-routing (URL vs local file vs stdin) is the CLI's concern — `Process` receives raw text directly.
+
+```go
+type applicationMeta struct {
+    Company string `json:"company"`
+    Role    string `json:"role"`
+    Score   int    `json:"score"`
+    Tokens  int    `json:"tokens"`
+    Date    string `json:"date"`
 }
 
-type JobMetadata struct {
-    ID          string     `json:"id"`
-    Company     string     `json:"company"`
-    Role        string     `json:"role"`
-    Status      string     `json:"status"`
-    DateCreated time.Time  `json:"date_created"`
-    DateApplied *time.Time `json:"date_applied"`
-    URL         string     `json:"url"`
-    TokensUsed  int        `json:"tokens_used"`
-}
-
-type JobResult struct {
-    ID         string
-    Company    string
-    Role       string
-    TokensUsed int
-    FolderPath string
-    ResumePath string
-    CoverPath  string // empty if no cover letter generated
-}
-
-func (a *App) Process(ctx context.Context, input JobInput) (*JobResult, error)
+func (a *App) Process(ctx context.Context, rawText string) (string, error)
 ```
 
 **Process() workflow:**
-1. Validate `JobInput` — exactly one of URL / LocalFile / RawText must be set
-2. Acquire job text:
-   - URL: fetch via `fetch.go`
-   - LocalFile: read file from disk
-   - RawText: use directly
-3. Parse: `Parse()` → `[]JobDescriptionNode` (typed, filtered AST)
-4. Load templates — `resume.txt` required (fail fast); `cover.txt` optional
-5. Call `GenerateAll()` — the only expensive/fallible operation; return error immediately if it fails; no filesystem has been touched
-6. Compute folder hash: first 4 hex chars of SHA-256 of the source (URL string, absolute file path, or raw text)
-7. Build folder name: `YYYY-MM-DD_company-slug_role-slug_hash` using slugified company/role from LLM result
-8. `os.Mkdir` the run folder — `ErrExist` means the same source was already processed successfully; return error (user must delete manually to re-run)
-9. Write files sequentially: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover returned), `job.json` atomically (write `.tmp`, then `os.Rename`)
+1. Parse raw text: `Parse(rawText)` → `[]JobDescriptionNode`
+2. Load templates: `fetchResume()` required (fail fast); `fetchCover()` optional (nil if absent)
+3. Call `GenerateAll()` — the only expensive/fallible operation; no filesystem has been touched yet
+4. Build folder name: `slugify(nodes)` using AST title nodes (format: `YYYY-MM-DD-{rand8}-{title-slug}`)
+5. `createApplicationDirectory()` — on `os.ErrExist`, appends `"col"` suffix and retries
+6. Write files sequentially: `resume.txt`, `cover.txt` (if cover returned), `meta.json`
+7. Return the output directory path
 
-**Failure behavior:** If any write after folder creation fails, the folder is left on disk for inspection. The deterministic hash-based folder name means re-running the same source will hit `ErrExist` — clean up the partial folder to retry. When invoked via the web API, `Process()` receives a context with `context.WithTimeout` (default 300s).
+**Failure behavior:** If any write after folder creation fails, the partial folder remains on disk for inspection. The random component in the slug means re-running the same source produces a new, unique folder.
 
 ### `Web Server` (web.go)
 
@@ -258,10 +238,10 @@ func (a *App) Serve(ctx context.Context, port string, ui fs.FS) error
 Accepts bare port number (e.g. `"8080"`), prepends `:` internally. Uses `http.Server.Shutdown(ctx)` for graceful shutdown — on context cancellation, in-flight requests (including long LLM calls) finish before the server exits.
 
 **Endpoints:**
-*   `POST /api/process` — accepts `{"url": "..."}` or `{"local_text": "..."}`, returns `JobResult`. Wraps `Process()` with `context.WithTimeout` (300s).
-*   `GET /api/jobs` — lists jobs; query params: `?status=applied&sort=date_desc&company=acme`. Returns `id` truncated to 8 chars. Tolerates corrupt `job.json` entries (logs warning, skips).
-*   `GET /api/jobs/{id}` — returns `JobDetail` (job.json merged with notes.md content).
-*   `PATCH /api/jobs/{id}` — **writable fields: `status`, `date_applied`, `notes` only.** All other fields (`id`, `company`, `role`, `date_created`, `url`, `tokens_used`) are read-only and rejected if present. `notes` writes to `notes.md` sidecar.
+*   `POST /api/process` — accepts `{"url": "..."}` or `{"local_text": "..."}`, wraps `Process()` with `context.WithTimeout` (300s). Returns output directory path and metadata.
+*   `GET /api/jobs` — lists jobs by reading `meta.json` from each run folder; query params for filtering/sorting. Tolerates corrupt `meta.json` entries (logs warning, skips). Note: the current `applicationMeta` struct will need extending with `status`, `url`, and date fields for full Phase 5 functionality.
+*   `GET /api/jobs/{id}` — returns job metadata from `meta.json`. ID scheme and extended metadata type TBD for Phase 5.
+*   `PATCH /api/jobs/{id}` — **writable fields: `status`, `date_applied` only.** Read-only fields rejected if present. Notes sidecar TBD for Phase 5.
 
 **CSRF:** Reject requests where `Origin` header is present and does not match `http://localhost:{port}` or `http://127.0.0.1:{port}`. Requests without `Origin` (e.g. curl) pass through. Additionally, POST/PATCH endpoints require `Content-Type: application/json` to block simple form submissions.
 
@@ -271,15 +251,14 @@ Accepts bare port number (e.g. `"8080"`), prepends `:` internally. Uses `http.Se
 ```bash
 $ jdextract setup
 $ jdextract generate https://acme.com/job/123
-  > Saved to: ./data/jobs/2026-02-24_acme_copywriter_a7x9/
-  > Resume: resume_custom.txt  |  Cover: cover_letter.txt
+  > Saved to: ./data/jobs/2026-02-24-a7x9k3m2-intermediate-copywriter/
+  > Resume: resume.txt  |  Cover: cover.txt
   > Tokens used: 2847
 $ jdextract generate --local ./my_job_paste.txt
-$ jdextract generate --no-cover https://acme.com/job/123
-$ jdextract list                                  # UUID truncated to 8 chars
-  > ID        DATE        COMPANY     ROLE          STATUS
-  > 550e8400  2026-02-24  Acme Corp   Copywriter    draft
-$ jdextract status 550e applied                   # UUID prefix match
+$ jdextract list                                  # folder-prefix identification
+  > FOLDER                                          COMPANY     ROLE                   STATUS
+  > 2026-02-24-a7x9k3m2-intermediate-copywriter    Acme Corp   Intermediate Copywriter draft
+$ jdextract status 2026-02-24-a7x9 applied        # folder prefix match
 $ jdextract serve --port 9090                     # Default: 8080
 ```
 
