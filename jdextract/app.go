@@ -17,7 +17,8 @@ type PortablePaths struct {
 }
 
 type App struct {
-	Paths PortablePaths
+	Paths  PortablePaths
+	Config Config
 }
 
 func getPortablePaths() (PortablePaths, error) {

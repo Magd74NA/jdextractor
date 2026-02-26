@@ -44,7 +44,7 @@ Every run creates a "Run Folder" under the data directory, forming a searchable 
 <exe_dir>/
 ├── jdextract                 # binary
 ├── config/                   # Configuration directory
-│   ├── config                # KEY=VALUE config (optional, fallback to env vars)
+│   ├── config.json           # JSON config (optional, fallback to env vars)
 │   └── templates/
 │       ├── resume.txt        # The user's master resume
 │       └── cover.txt         # The user's base cover letter (optional)
@@ -118,7 +118,7 @@ func (a *App) createExampleTemplates() error
 `createExampleTemplates()` creates `resume.txt` and `cover.txt` template files in `config/templates/` if they don't already exist (won't overwrite user customizations). Files are created with `0644` permissions.
 
 ### `Config` (config.go)
-*   Reads `<exe_dir>/config/config` (KEY=VALUE format, `#` comments). Path provided by `App.Paths.Config`.
+*   Reads `<exe_dir>/config/config.json` (JSON format). Path provided by `App.Paths.Config`.
 *   Precedence: **env var > config file > default/error**. `DEEPSEEK_MODEL` defaults to `deepseek-chat`.
 *   **Permissions:** Config file created with `0600` (contains API key). Job output files use `0644`.
 
