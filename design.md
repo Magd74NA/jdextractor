@@ -25,7 +25,7 @@ jdextract/
 │       └── index.html       # Embedded UI (HTML/Alpine/Tailwind/DaisyUI)
 └── jdextract/               # Core package (importable library)
     ├── app.go               # Central App struct
-    ├── config.go            # Portable paths, env vars + config file
+    ├── config.go            # JSON config loading and file creation
     ├── fetch.go             # Hybrid HTTP fetch with fallback strategies
     ├── parse.go             # HTML parsing (company/role + slug)
     ├── llm.go               # DeepSeek HTTP client, retry logic
@@ -44,7 +44,7 @@ Every run creates a "Run Folder" under the data directory, forming a searchable 
 <exe_dir>/
 ├── jdextract                 # binary
 ├── config/                   # Configuration directory
-│   ├── config.json           # JSON config (optional, fallback to env vars)
+│   ├── config.json           # JSON config (optional)
 │   └── templates/
 │       ├── resume.txt        # The user's master resume
 │       └── cover.txt         # The user's base cover letter (optional)
@@ -102,7 +102,8 @@ type PortablePaths struct {
 }
 
 type App struct {
-    Paths PortablePaths
+    Paths  PortablePaths
+    Config Config
 }
 
 func getPortablePaths() (PortablePaths, error)
