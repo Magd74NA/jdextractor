@@ -13,6 +13,7 @@ type applicationMeta struct {
 	Role    string `json:"role"`
 	Score   int    `json:"score"`
 	Tokens  int    `json:"tokens"`
+	Date    string `json:"date"`
 }
 
 func (a *App) Process(ctx context.Context, rawText string) (string, error) {
@@ -57,7 +58,9 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 		}
 	}
 
-	meta := applicationMeta{Company: company, Role: role, Score: score, Tokens: tokens}
+	date := currentDate()
+
+	meta := applicationMeta{Company: company, Role: role, Score: score, Tokens: tokens, Date: date}
 	metaBytes, err := json.Marshal(meta)
 	if err != nil {
 		return "", fmt.Errorf("marshal meta: %w", err)

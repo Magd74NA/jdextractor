@@ -35,10 +35,12 @@
 
 - [x] `storage.go`: pure FS primitives — `slugify()`, `createApplicationDirectory()`, `fetchResume()`, `fetchCover()`; no orchestration logic
 - [x] `generate.go`: pure LLM orchestration only — no filesystem access; seam with storage.go is `[]JobDescriptionNode` + plain strings in, plain strings out
-- [x] `process.go`: `(a *App) Process(ctx, nodes)` — LLM-first pipeline (load templates → `GenerateAll` → create dir → write files); `applicationMeta` struct written as `meta.json`
-- [ ] `process.go`: expand `Process(ctx, rawText string) (string, error)` — returns output dir path; parse → load templates → `GenerateAll` → create dir → write files; source routing (URL fetch / file read / paste) is a CLI concern, not a library concern
-- [ ] `storage.go`: folder name: `YYYY-MM-DD_company-slug_role-slug_hash` where hash = first 4 hex chars of SHA-256 of `rawText`; error on `ErrExist` (same content already processed)
-- [ ] `process.go`: write files sequentially after folder creation: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json` atomically (`.tmp` → `os.Rename`)
+- [x] `process.go`: `(a *App) Process(ctx, rawText string) (string, error)` — returns output dir; parse → load templates → `GenerateAll` → create dir → write files; source routing is CLI concern
+- [x] `storage.go`: `currentDate()` — returns `YYYY-MM-DD` via `time.Now().Format`
+- [x] `storage.go`: `slugify()` uses `currentDate()` as prefix; current format: `YYYY-MM-DD-{rand8}-{title-slug}`
+- [x] `process.go`: `applicationMeta` has `date` field; `currentDate()` called and stored in metadata
+- [ ] `storage.go`: complete folder naming — change `slugify(nodes)` to `slugify(company, role, rawText string)`; replace `{rand8}` midfix with first 4 hex chars of SHA-256 of `rawText`; replace `{title-slug}` with `{company-slug}_{role-slug}`; final format: `YYYY-MM-DD_{company-slug}_{role-slug}_{hash}`; error on `ErrExist`
+- [ ] `process.go`: pass `company`, `role`, `rawText` into `slugify`; write files: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json` atomically (`.tmp` → `os.Rename`)
 
 ---
 

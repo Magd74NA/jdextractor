@@ -7,9 +7,14 @@ import (
 	"path/filepath"
 	"regexp"
 	st "strings"
+	"time"
 )
 
 var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
+
+func currentDate() string {
+	return time.Now().Format("2006-01-02")
+}
 
 func slugify(nodes []JobDescriptionNode) string {
 	var title string
@@ -25,8 +30,8 @@ func slugify(nodes []JobDescriptionNode) string {
 			break
 		}
 	}
-
-	prefix := rand.Text()[:8]
+	prefix := (currentDate())
+	midfix := rand.Text()[:8]
 	title = st.TrimSpace(st.ToValidUTF8(st.ToLower(title), ""))
 	slug := slugRe.ReplaceAllString(title, "-")
 	slug = st.Trim(slug, "-")
@@ -34,7 +39,7 @@ func slugify(nodes []JobDescriptionNode) string {
 	if slug == "" {
 		return prefix
 	}
-	return prefix + "-" + slug
+	return prefix + "-" + midfix + "-" + slug
 }
 
 func createApplicationDirectory(slug string, a *App) error {
