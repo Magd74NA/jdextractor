@@ -9,7 +9,7 @@ By providing a target Job URL and a base resume text file, the tool uses an LLM 
 *   **Zero Databases:** The filesystem is the database. Every job run creates a structured folder.
 *   **Zero JS Build Steps:** The web UI is a single embedded HTML file using CDN-hosted Alpine.js, Tailwind, and DaisyUI.
 *   **One LLM Dependency:** DeepSeek for all text analysis and generation. `r.jina.ai` is used for all URL fetching; it requires no account or API key.
-*   **Zero Go Module Dependencies:** All functionality uses Go stdlib. `r.jina.ai` returns markdown, so company/role extraction uses `regexp` rather than an HTML parser.
+*   **One Go Module Dependency:** `github.com/toon-format/toon-go` (vendored). Used to serialize the parsed AST into TOON format before sending to the LLM — compact, token-efficient, structured. All other functionality uses Go stdlib.
 *   **Zero System Dependencies:** No external tools required (no Pandoc, no headless browsers for MVP1).
 *   **Plain Text Output:** All generated files are `.txt` for simplicity.
 *   **Human-in-the-Loop:** The AI generates text. The human reviews and edits the text.
@@ -131,11 +131,18 @@ All URL fetching goes through `https://r.jina.ai/{fullURL}`, which handles both 
 **Errors:** HTTP 429 is handled internally with exponential backoff and retry. `FetchJobDescription` accepts a `context.Context` as its first parameter so the backoff loop can be interrupted by the caller's timeout (e.g. the 300s web deadline) or Ctrl+C. All other failures return the error directly; user can fall back to `--local`.
 
 ### `Parse` (parse.go)
-Extracts company/role from the markdown returned by `r.jina.ai` without LLM (saves tokens and latency):
-*   Regex patterns on markdown headings (`#`, `##`) for common job board formats (Greenhouse, Lever, Workday)
-*   Falls back to LLM only if regex extraction fails completely
+Converts the markdown returned by `r.jina.ai` into a typed, filtered line-level AST.
+
+Each non-empty line is classified as one of 15 `NodeType` constants ordered from most generic (`body`) to most specific (`jina_title`). Noise types (`jina_marker`, `setext_underline`, `nav_link`) are stripped; long low-information body lines (> 300 chars) are dropped to preserve LLM context window. Returns `[]JobDescriptionNode` — serialization to TOON is handled downstream in `generate.go`.
 
 ```go
+// classifyLine returns the most specific NodeType for a single non-empty line,
+// or "" to signal the line should be dropped.
+func classifyLine(line string) string
+
+// Parse returns the filtered AST: noise removed, long body lines dropped.
+func Parse(s string) []JobDescriptionNode
+
 // slug normalizes s for use in folder names ("Acme & Co." -> "acme-co").
 // Returns "unknown" if the sanitized result is empty.
 func slug(s string) string
@@ -180,20 +187,20 @@ func (a *App) Process(ctx context.Context, input JobInput) (*JobResult, error)
 **Process() workflow:**
 1. Validate `JobInput` — exactly one of URL / LocalFile / RawText must be set
 2. Acquire job text:
-   - URL: hybrid fetch (`fetch.go`)
+   - URL: fetch via `fetch.go`
    - LocalFile: read file from disk
    - RawText: use directly
-3. Extract company & role:
-   - **URL path:** HTML parse via `golang.org/x/net/html`, fallback to LLM
-   - **LocalFile / RawText path:** skip HTML parse, go directly to LLM extraction
-4. Apply `slug()` to company and role
-5. Generate UUID v4 (`crypto/rand`)
-6. Generate folder hash suffix: first 4 hex chars of SHA-256 of the source (URL string, absolute file path, or raw text)
-7. Create run folder `<exe_dir>/data/jobs/YYYY-MM-DD_company_role_hash/`
-8. Save `job_raw.txt`
-9. Call LLM (resume + optional cover letter)
-10. Write output files (`resume_custom.txt`, `cover_letter.txt`)
-11. Write `job.json` (atomic: write to `.tmp`, then `os.Rename`)
+3. Parse: `Parse()` → `[]JobDescriptionNode` (typed, filtered AST)
+4. Serialize AST to TOON via `toon-go` — this is the job description payload sent to the LLM
+5. Extract company & role: LLM extraction from TOON payload
+6. Apply `slug()` to company and role
+7. Generate UUID v4 (`crypto/rand`)
+8. Generate folder hash suffix: first 4 hex chars of SHA-256 of the source (URL string, absolute file path, or raw text)
+9. Create run folder `<exe_dir>/data/jobs/YYYY-MM-DD_company_role_hash/`
+10. Save `job_raw.txt`
+11. Call LLM (resume + optional cover letter, TOON job payload)
+12. Write output files (`resume_custom.txt`, `cover_letter.txt`)
+13. Write `job.json` (atomic: write to `.tmp`, then `os.Rename`)
 
 **Failure behavior:** On partial failure after folder creation, the folder is left on disk for inspection. Re-running against the same source errors if the folder already exists (user must delete manually). When invoked via the web API, `Process()` receives a context with `context.WithTimeout` (default 300s).
 

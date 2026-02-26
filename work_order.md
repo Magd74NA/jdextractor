@@ -5,6 +5,7 @@
 ### Setup
 - [x] Set up project structure: `cmd/main.go`, `cmd/web/`, `jdextract/`
 - [x] ~~Add `golang.org/x/net/html` dependency~~ — dropped; `r.jina.ai` returns markdown, parsed with stdlib `regexp`
+- [x] Add `github.com/toon-format/toon-go` dependency (vendored via `go mod vendor`); used to serialize the parsed AST to TOON format for LLM consumption
 - [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
 - [x] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
 - [x] `config.go`: parse `<exe_dir>/config/config.json` (JSON); env var override deferred to post-MVP1
@@ -15,7 +16,8 @@
 - [x] `fetch.go`: exponential backoff retry loop on HTTP 429, handled internally within `FetchJobDescription`; accepts `context.Context` to allow cancellation; all other failures return error directly
 
 ### Parsing
-- [ ] `parse.go`: extract company/role from markdown headings (`#`, `##`) via stdlib `regexp`; patterns for common job board formats (Greenhouse, Lever, Workday)
+- [x] `parse.go`: line-level AST via `buildProtoAST()` — classifies each line into 15 `NodeType` constants (generic → specific); drops noise and long body lines
+- [x] `parse.go`: `filterNodes()` removes always-drop types; `Parse()` returns the filtered `[]JobDescriptionNode`
 - [ ] `parse.go`: `slug()` — returns `"unknown"` when sanitized result is empty
 
 ---
@@ -34,7 +36,7 @@
 
 - [ ] `generate.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
 - [ ] `generate.go`: implement `Process()` following workflow in design.md section 5
-- [ ] `generate.go`: URL path uses HTML parse then LLM fallback; LocalFile/RawText skip directly to LLM extraction
+- [ ] `generate.go`: all paths run through `Parse()` → TOON serialization (`toon-go`) → LLM prompt; TOON encoding is the last-mile step before the LLM call, not a parse.go concern
 - [ ] `generate.go`: accept `context.Context` throughout (web callers set 300s timeout)
 - [ ] `generate.go`: atomic write for `job.json` (write `.tmp`, then `os.Rename`)
 - [ ] `generate.go`: on partial failure, leave folder on disk; error if folder already exists on re-run

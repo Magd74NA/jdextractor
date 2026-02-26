@@ -3,8 +3,6 @@ package jdextract
 import (
 	"regexp"
 	"strings"
-
-	_ "github.com/toon-format/toon-go"
 )
 
 // NodeType constants, ordered from most generic to most specific.
