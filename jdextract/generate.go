@@ -23,10 +23,9 @@ Your tasks:
 3. If a base cover letter is provided, draft a tailored cover letter for this role.
 
 Respond with a JSON object with exactly these keys:
-- "company": company name (string)
-- "role": job title (string)
-- "resume": full tailored resume text (string)
-- "cover_letter": tailored cover letter (string) — include ONLY if a base cover letter was provided`
+- "Result": object with "company" (string) and "role" (string)
+- "Resume": full tailored resume text (string)
+- "Cover": tailored cover letter (string) — include ONLY if a base cover letter was provided`
 
 func GenerateAll(
 	ctx context.Context,
@@ -80,24 +79,23 @@ func GenerateAll(
 		return "", "", "", nil, 0, fmt.Errorf("api returned no choices")
 	}
 
-	var result map[string]any
+	var result struct {
+		Result struct {
+			Company string `json:"company"`
+			Role    string `json:"role"`
+		} `json:"Result"`
+		Resume string  `json:"Resume"`
+		Cover  *string `json:"Cover"`
+	}
 	if err := json.Unmarshal([]byte(apiResp.Choices[0].Message.Content), &result); err != nil {
 		return "", "", "", nil, 0, fmt.Errorf("decode llm json output: %w", err)
 	}
 
-	if v, ok := result["company"].(string); ok {
-		company = v
-	}
-	if v, ok := result["role"].(string); ok {
-		role = v
-	}
-	if v, ok := result["resume"].(string); ok {
-		resume = v
-	}
+	company = result.Result.Company
+	role = result.Result.Role
+	resume = result.Resume
 	if baseCover != nil {
-		if v, ok := result["cover_letter"].(string); ok {
-			cover = &v
-		}
+		cover = result.Cover
 	}
 
 	return company, role, resume, cover, apiResp.Usage.TotalTokens, nil
