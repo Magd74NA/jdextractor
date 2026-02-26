@@ -7,7 +7,8 @@
 - [x] ~~Add `golang.org/x/net/html` dependency~~ — dropped; `r.jina.ai` returns markdown, parsed with stdlib `regexp`
 - [x] ~~Add `github.com/toon-format/toon-go` dependency~~ — dropped; AST serialized to minified JSON via `encoding/json`; zero external dependencies
 - [x] `app.go`: `GetPortablePaths()` — resolve exe dir, follow symlinks, macOS `.app` bundle support
-- [x] `app.go`: implement `NewApp()` and `Setup()` (creates `templates/`, `data/jobs/`, example templates)
+- [x] `app.go`: `NewApp()` — constructor only; types `App` and `PortablePaths`
+- [x] `setup.go`: `Setup()` and `createExampleTemplates()` — creates `templates/`, `data/jobs/`, example templates; split from `app.go`
 - [x] `config.go`: parse `<exe_dir>/config/config.json` (JSON); env var override deferred to post-MVP1
 - [x] `config.go`: create config file with `0600` permissions (contains API key); job files use `0644`
 
@@ -32,13 +33,13 @@
 
 ## Phase 3: Generation Pipeline
 
-- [x] `storage.go`: `slugify()` — derives slug from parsed AST nodes (`jina_title` preferred, `job_title` fallback); prepends 8-char random prefix; returns bare prefix if no title found
-- [x] `storage.go`: `fetchResume()` / `fetchCover()` — load template files; `fetchResume` returns error if missing; `fetchCover` returns error if missing (caller decides whether cover is required)
+- [x] `storage.go`: pure FS primitives — `slugify()`, `createApplicationDirectory()`, `fetchResume()`, `fetchCover()`; no orchestration logic
 - [x] `generate.go`: pure LLM orchestration only — no filesystem access; seam with storage.go is `[]JobDescriptionNode` + plain strings in, plain strings out
+- [x] `process.go`: `(a *App) Process(ctx, nodes)` — LLM-first pipeline (load templates → `GenerateAll` → create dir → write files); `applicationMeta` struct written as `meta.json`
 - [ ] `storage.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
-- [ ] `storage.go`: implement `(a *App) Process(ctx, input)` — LLM-first pipeline: validate → fetch/read → parse → load templates → `GenerateAll` → filesystem; no filesystem writes until `GenerateAll` succeeds
+- [ ] `process.go`: expand `Process(ctx, input JobInput)` — validate → fetch/read → parse → load templates → `GenerateAll` → filesystem; no filesystem writes until `GenerateAll` succeeds
 - [ ] `storage.go`: folder name: `YYYY-MM-DD_company-slug_role-slug_hash` where hash = first 4 hex chars of SHA-256 of the source (URL / absolute file path / raw text); error on `ErrExist` (same source already processed)
-- [ ] `storage.go`: write files sequentially after folder creation: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json` atomically (`.tmp` → `os.Rename`)
+- [ ] `process.go`: write files sequentially after folder creation: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json` atomically (`.tmp` → `os.Rename`)
 
 ---
 
