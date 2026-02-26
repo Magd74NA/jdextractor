@@ -189,9 +189,10 @@ func GenerateAll(
 All filesystem and job-management concerns. No LLM logic — calls `GenerateAll` as a black box.
 
 ```go
-// slug normalizes s for use in folder names ("Acme & Co." -> "acme-co").
-// Returns "unknown" if the sanitized result is empty.
-func slug(s string) string
+// slugify derives a slug from parsed AST nodes: prefers jina_title, falls back
+// to job_title. Prepends an 8-char random prefix. Returns the bare prefix if
+// no title node is found.
+func slugify(nodes []JobDescriptionNode) string
 
 type JobInput struct {
     URL       string // mutually exclusive
@@ -230,17 +231,14 @@ func (a *App) Process(ctx context.Context, input JobInput) (*JobResult, error)
    - LocalFile: read file from disk
    - RawText: use directly
 3. Parse: `Parse()` → `[]JobDescriptionNode` (typed, filtered AST)
-4. Load templates (`resume.txt` required; `cover.txt` optional)
-5. Call `GenerateAll()` — returns company, role, resume, cover, score, tokensUsed
-6. Apply `slug()` to company and role
-7. Generate UUID v4 (`crypto/rand`)
-8. Generate folder hash suffix: first 4 hex chars of SHA-256 of the source (URL string, absolute file path, or raw text)
-9. Create run folder `<exe_dir>/data/jobs/YYYY-MM-DD_company_role_hash/`
-10. Write `job_raw.txt`
-11. Write output files (`resume_custom.txt`, `cover_letter.txt`)
-12. Write `job.json` atomically (write to `.tmp`, then `os.Rename`)
+4. Load templates — `resume.txt` required (fail fast); `cover.txt` optional
+5. Call `GenerateAll()` — the only expensive/fallible operation; return error immediately if it fails; no filesystem has been touched
+6. Compute folder hash: first 4 hex chars of SHA-256 of the source (URL string, absolute file path, or raw text)
+7. Build folder name: `YYYY-MM-DD_company-slug_role-slug_hash` using slugified company/role from LLM result
+8. `os.Mkdir` the run folder — `ErrExist` means the same source was already processed successfully; return error (user must delete manually to re-run)
+9. Write files sequentially: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover returned), `job.json` atomically (write `.tmp`, then `os.Rename`)
 
-**Failure behavior:** On partial failure after folder creation, the folder is left on disk for inspection. Re-running against the same source errors if the folder already exists (user must delete manually). When invoked via the web API, `Process()` receives a context with `context.WithTimeout` (default 300s).
+**Failure behavior:** If any write after folder creation fails, the folder is left on disk for inspection. The deterministic hash-based folder name means re-running the same source will hit `ErrExist` — clean up the partial folder to retry. When invoked via the web API, `Process()` receives a context with `context.WithTimeout` (default 300s).
 
 ### `Web Server` (web.go)
 

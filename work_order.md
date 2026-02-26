@@ -32,12 +32,13 @@
 
 ## Phase 3: Generation Pipeline
 
-- [ ] `storage.go`: `slug()` — normalizes company/role strings for folder names ("Acme & Co." → "acme-co"); returns `"unknown"` when sanitized result is empty
+- [x] `storage.go`: `slugify()` — derives slug from parsed AST nodes (`jina_title` preferred, `job_title` fallback); prepends 8-char random prefix; returns bare prefix if no title found
+- [x] `storage.go`: `fetchResume()` / `fetchCover()` — load template files; `fetchResume` returns error if missing; `fetchCover` returns error if missing (caller decides whether cover is required)
+- [x] `generate.go`: pure LLM orchestration only — no filesystem access; seam with storage.go is `[]JobDescriptionNode` + plain strings in, plain strings out
 - [ ] `storage.go`: define `JobInput` (URL / LocalFile / RawText — exactly one set), `JobResult`, `JobMetadata`
-- [ ] `storage.go`: implement `(a *App) Process(ctx, input)` — fetch/read → parse → load templates → `GenerateAll` → write files; no LLM logic in storage.go
-- [ ] `storage.go`: atomic write for `job.json` (write `.tmp`, then `os.Rename`)
-- [ ] `storage.go`: on partial failure, leave folder on disk; error if folder already exists on re-run
-- [ ] `generate.go`: pure LLM orchestration only — no filesystem access; seam with storage.go is `[]JobDescriptionNode` + plain strings in, plain strings out
+- [ ] `storage.go`: implement `(a *App) Process(ctx, input)` — LLM-first pipeline: validate → fetch/read → parse → load templates → `GenerateAll` → filesystem; no filesystem writes until `GenerateAll` succeeds
+- [ ] `storage.go`: folder name: `YYYY-MM-DD_company-slug_role-slug_hash` where hash = first 4 hex chars of SHA-256 of the source (URL / absolute file path / raw text); error on `ErrExist` (same source already processed)
+- [ ] `storage.go`: write files sequentially after folder creation: `job_raw.txt`, `resume_custom.txt`, `cover_letter.txt` (if cover), `job.json` atomically (`.tmp` → `os.Rename`)
 
 ---
 
