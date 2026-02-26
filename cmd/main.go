@@ -13,5 +13,5 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Errors during setup: %s", err)
 		os.Exit(1)
 	}
-	fmt.Printf("New app created! %s", App.Paths.Data)
+	fmt.Printf("Initial setup complete! app data available at: %s", App.Paths.Root)
 }

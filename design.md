@@ -1,4 +1,3 @@
-
 # Design Document: jdextract
 
 ## 1. Project Summary
@@ -39,7 +38,7 @@ The `//go:embed web` directive in `cmd/main.go` embeds the UI. `fs.Sub(webFiles,
 ## 4. Data Model (Filesystem as CRM)
 Every run creates a "Run Folder" under the data directory, forming a searchable application history.
 
-**Portable layout** — all paths resolve relative to the executable via `GetPortablePaths()`. On macOS inside a `.app` bundle, the root is the directory containing the `.app`. No hard-coded home directory.
+**Portable layout** — all paths resolve relative to the executable via `getPortablePaths()`. On macOS inside a `.app` bundle, the root is the directory containing the `.app`. No hard-coded home directory.
 
 ```text
 <exe_dir>/
@@ -94,15 +93,32 @@ type JobDetail struct {
 Central orchestrator holding configuration and portable paths. Used by both CLI and Web interfaces.
 
 ```go
-func GetPortablePaths() (*PortablePaths, error)
-func NewApp() *App
+type PortablePaths struct {
+    Root      string
+    Jobs      string
+    Data      string
+    Config    string
+    Templates string
+}
+
+type App struct {
+    Paths PortablePaths
+}
+
+func getPortablePaths() (PortablePaths, error)
+func NewApp() (*App, error)
 func (a *App) Setup() error
+func (a *App) createExampleTemplates() error
 ```
 
-`GetPortablePaths()` resolves the executable's location (following symlinks), then derives `config`, `templates/`, and `data/` paths relative to it. On macOS inside a `.app` bundle, it walks up to the directory containing the `.app`. The caller (`main.go`) creates the root context via `signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)` and passes it into App methods. App does not handle signals itself.
+`getPortablePaths()` resolves the executable's location (following symlinks), then derives `config`, `templates/`, and `data/` paths relative to it. On macOS inside a `.app` bundle, it walks up to the directory containing the `.app`. The caller (`main.go`) creates the root context via `signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)` and passes it into App methods. App does not handle signals itself.
+
+`NewApp()` returns an error rather than calling `os.Exit()`, making it testable and allowing callers to handle errors gracefully. It calls `Setup()` which creates all required directories and example templates.
+
+`createExampleTemplates()` creates `resume.txt` and `cover.txt` template files in `config/templates/` if they don't already exist (won't overwrite user customizations). Files are created with `0644` permissions.
 
 ### `Config` (config.go)
-*   Reads `<exe_dir>/config` (KEY=VALUE format, `#` comments). Path provided by `GetPortablePaths()`.
+*   Reads `<exe_dir>/config/config` (KEY=VALUE format, `#` comments). Path provided by `App.Paths.Config`.
 *   Precedence: **env var > config file > default/error**. `DEEPSEEK_MODEL` defaults to `deepseek-chat`.
 *   **Permissions:** Config file created with `0600` (contains API key). Job output files use `0644`.
 
