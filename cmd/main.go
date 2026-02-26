@@ -54,7 +54,9 @@ func main() {
 	}
 
 	nodes := jdextract.Parse(string(raw))
-	fmt.Printf("Parsed %d nodes from test_jd.md\n", len(nodes))
+	fmt.Printf("NODE STRUCTURE:")
+	fmt.Println(nodes)
+	fmt.Printf("\n\nParsed %d nodes from test_jd.md\n", len(nodes))
 
 	// No cover letter for this test run.
 	company, role, resume, cover, score, tokens, err := jdextract.GenerateAll(
