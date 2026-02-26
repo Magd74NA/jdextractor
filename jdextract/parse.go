@@ -1,12 +1,30 @@
 package jdextract
 
-import "regexp"
+import "strings"
 
-var (
-	// headingRe extracts the text of the first # or ## markdown heading.
-	headingRe = regexp.MustCompile(`(?m)^#{1,2}\s+(.+)`)
+func Parse(s string) {
+}
 
-	// separatorRe splits common "Role at Company" / "Role - Company" / "Role | Company" patterns.
-	// Covers Greenhouse ("Role at Company"), Lever ("Role - Company"), Workday ("Role | Company").
-	separatorRe = regexp.MustCompile(`(?i)^(.+?)\s+(?:at|[-–—|])\s+(.+)$`)
-)
+type JobDescriptionNode struct {
+	Content  string
+	NodeType string
+}
+
+func buildProtoAST(s string) []JobDescriptionNode {
+	lines := strings.Split(s, "\n")
+	nodes := make([]JobDescriptionNode, 0, len(lines))
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		node := JobDescriptionNode{
+			Content:  line,
+			NodeType: "unknown",
+		}
+		nodes = append(nodes, node)
+	}
+
+	return nodes
+}
