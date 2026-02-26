@@ -2,6 +2,7 @@ package jdextract
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,6 +20,7 @@ type PortablePaths struct {
 type App struct {
 	Paths  PortablePaths
 	Config Config
+	Client http.Client
 }
 
 func getPortablePaths() (PortablePaths, error) {

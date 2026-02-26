@@ -33,5 +33,11 @@ func main() {
 	}
 	App.Config = *config
 
-	fmt.Printf("Current config!: \nPORT:%d ", App.Config.Port)
+	fmt.Printf("Current config: \nPORT:%d ", App.Config.Port)
+
+	client, err := jdextract.InitiateClient()
+	if err != nil {
+		fmt.Printf("Test request failed. Are you sure you are connected to the internet?\nRecieved the following error:%s\n", err)
+	}
+	App.Client = *client
 }
