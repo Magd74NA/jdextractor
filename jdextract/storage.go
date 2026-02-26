@@ -70,4 +70,3 @@ func fetchResume(a *App) (string, error) {
 	}
 	return string(content), nil
 }
-

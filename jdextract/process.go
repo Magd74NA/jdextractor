@@ -15,12 +15,12 @@ type applicationMeta struct {
 	Tokens  int    `json:"tokens"`
 }
 
-func (a *App) Process(ctx context.Context, rawText string) error {
+func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 	nodes := Parse(rawText)
 
 	baseResume, err := fetchResume(a)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var baseCover *string
@@ -38,33 +38,33 @@ func (a *App) Process(ctx context.Context, rawText string) error {
 		baseCover,
 	)
 	if err != nil {
-		return fmt.Errorf("generate: %w", err)
+		return "", fmt.Errorf("generate: %w", err)
 	}
 
 	slug := slugify(nodes)
 	if err := createApplicationDirectory(slug, a); err != nil {
-		return fmt.Errorf("create directory: %w", err)
+		return "", fmt.Errorf("create directory: %w", err)
 	}
 	dir := filepath.Join(a.Paths.Jobs, slug)
 
 	if err := os.WriteFile(filepath.Join(dir, "resume.txt"), []byte(resume), 0644); err != nil {
-		return fmt.Errorf("write resume: %w", err)
+		return "", fmt.Errorf("write resume: %w", err)
 	}
 
 	if cover != nil {
 		if err := os.WriteFile(filepath.Join(dir, "cover.txt"), []byte(*cover), 0644); err != nil {
-			return fmt.Errorf("write cover: %w", err)
+			return "", fmt.Errorf("write cover: %w", err)
 		}
 	}
 
 	meta := applicationMeta{Company: company, Role: role, Score: score, Tokens: tokens}
 	metaBytes, err := json.Marshal(meta)
 	if err != nil {
-		return fmt.Errorf("marshal meta: %w", err)
+		return "", fmt.Errorf("marshal meta: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "meta.json"), metaBytes, 0644); err != nil {
-		return fmt.Errorf("write meta: %w", err)
+		return "", fmt.Errorf("write meta: %w", err)
 	}
 
-	return nil
+	return dir, nil
 }
