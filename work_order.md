@@ -11,9 +11,8 @@
 - [x] `config.go`: create config file with `0600` permissions (contains API key); job files use `0644`
 
 ### Fetching
-- [ ] `fetch.go`: hybrid strategy — direct GET, then `r.jina.ai/{url}`, then error with `--local` hint
-- [ ] `fetch.go`: size caps (500KB raw HTML, 100KB Jina)
-- [ ] `fetch.go`: distinct errors — `ErrJinaRateLimited` (429, suggest retry) vs `ErrJinaExtraction` (suggest `--local`)
+- [ ] `fetch.go`: fetch via `r.jina.ai/{url}`; 100KB response cap
+- [ ] `fetch.go`: `ErrJinaRateLimited` on HTTP 429; all other failures return error directly
 
 ### Parsing
 - [ ] `parse.go`: extract company/role from `<title>` and `<h1>` via `golang.org/x/net/html`

@@ -8,7 +8,7 @@ By providing a target Job URL and a base resume text file, the tool uses an LLM 
 ## 2. Core Constraints
 *   **Zero Databases:** The filesystem is the database. Every job run creates a structured folder.
 *   **Zero JS Build Steps:** The web UI is a single embedded HTML file using CDN-hosted Alpine.js, Tailwind, and DaisyUI.
-*   **One LLM Dependency:** DeepSeek for all text analysis and generation. `r.jina.ai` is used as a fetch fallback for JS-heavy pages; it requires no account or API key.
+*   **One LLM Dependency:** DeepSeek for all text analysis and generation. `r.jina.ai` is used for all URL fetching; it requires no account or API key.
 *   **One Go Module Dependency:** `golang.org/x/net/html` for HTML parsing. All other functionality uses Go stdlib.
 *   **Zero System Dependencies:** No external tools required (no Pandoc, no headless browsers for MVP1).
 *   **Plain Text Output:** All generated files are `.txt` for simplicity.
@@ -123,14 +123,12 @@ func (a *App) createExampleTemplates() error
 *   `DEEPSEEK_MODEL` defaults to `deepseek-chat`. Env var override and precedence rules deferred to post-MVP1.
 *   **Permissions:** Config file created with `0600` (contains API key). Job output files use `0644`.
 
-### `Fetch` (fetch.go) — Hybrid Strategy
-1. **First:** Direct HTTP GET (works for Greenhouse, Lever static pages)
-2. **Second:** `https://r.jina.ai/{fullURL}` (extracts text from React SPAs, free, no auth)
-3. **Third:** Return error with `--local` hint
+### `Fetch` (fetch.go)
+All URL fetching goes through `https://r.jina.ai/{fullURL}`, which handles both static pages and JS-heavy SPAs without a headless browser.
 
-**Safety caps:** 500KB raw HTML; 100KB Jina responses.
+**Safety cap:** 100KB response limit.
 
-**Distinct errors:** Jina HTTP 429 returns `ErrJinaRateLimited` (suggests wait + retry). Other Jina failures return `ErrJinaExtraction` (suggests `--local` fallback). Messages differ so the user knows which action to take.
+**Errors:** HTTP 429 returns `ErrJinaRateLimited` (suggests wait + retry). All other failures return the error directly; user can fall back to `--local`.
 
 ### `Parse` (parse.go)
 Extracts company/role from HTML without LLM (saves tokens and latency):
