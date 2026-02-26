@@ -15,7 +15,9 @@ type applicationMeta struct {
 	Tokens  int    `json:"tokens"`
 }
 
-func (a *App) Process(ctx context.Context, nodes []JobDescriptionNode) error {
+func (a *App) Process(ctx context.Context, rawText string) error {
+	nodes := Parse(rawText)
+
 	baseResume, err := fetchResume(a)
 	if err != nil {
 		return err
