@@ -20,7 +20,7 @@ By providing a target Job URL and a base resume text file, the tool uses an LLM 
 jdextract/
 ├── go.mod
 ├── cmd/
-│   ├── main.go              # CLI entry point; //go:embed web; calls jdextract.App
+│   ├── main.go              # CLI entry point; calls jdextract.App (//go:embed web in Phase 5)
 │   └── web/
 │       └── index.html       # Embedded UI (HTML/Alpine/Tailwind/DaisyUI)
 └── jdextract/               # Core package (importable library)
@@ -36,7 +36,7 @@ jdextract/
     └── web.go               # (Phase 5, not yet created) net/http server; accepts fs.FS from caller
 ```
 
-The `//go:embed web` directive in `cmd/main.go` embeds the UI. `fs.Sub(webFiles, "web")` strips the prefix before passing to `App.Serve()`.
+In Phase 5, a `//go:embed web` directive in `cmd/main.go` will embed the UI. `fs.Sub(webFiles, "web")` will strip the prefix before passing to `App.Serve()`.
 
 ## 4. Data Model (Filesystem as CRM)
 Every run creates a "Run Folder" under the data directory, forming a searchable application history.
@@ -168,7 +168,7 @@ tailored cover letter (only present if base cover was provided)
 *   **Validation:** After extraction, `GenerateAll` errors immediately if `company`, `role`, or `resume` are empty, with a diagnostic message showing what was (and wasn't) parsed. This surfaces prompt compliance failures rather than silently writing empty files.
 
 *   **Score:** Integer 1–10 subjective rating of how well the base resume matches the job requirements. Defaults to 0 on parse failure — non-fatal.
-*   **Optional Cover Letter:** Pass `nil` for `baseCover` to skip. `<cover>` tag is omitted from the prompt instruction when no base cover is provided; the regexp only runs when `baseCover != nil`.
+*   **Optional Cover Letter:** Pass `nil` for `baseCover` to skip. The system prompt always mentions `<cover>` (with "include ONLY if a base cover letter was provided"); the user message conditionally includes the base cover text, and the cover extraction regexp only runs when `baseCover != nil`.
 *   **Company/Role Extraction:** Extracted by the LLM from the JSON payload in the same call — no separate fallback prompt.
 
 ```go
