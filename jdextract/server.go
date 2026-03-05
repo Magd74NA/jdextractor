@@ -2,14 +2,10 @@ package jdextract
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"net/http"
 	"slices"
 )
-
-//go:embed web/index.html
-var webFiles embed.FS
 
 // Serve starts the web UI on the given port and blocks until ctx is cancelled,
 // at which point it performs a graceful shutdown via http.Server.Shutdown.
@@ -17,16 +13,7 @@ var webFiles embed.FS
 // All routes pass through csrfMiddleware before reaching their handlers.
 func (a *App) Serve(ctx context.Context, port string) error {
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		data, err := webFiles.ReadFile("web/index.html")
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(data)
-	})
+	a.registerRoutes(mux)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
