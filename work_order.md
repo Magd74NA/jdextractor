@@ -40,7 +40,7 @@
 - [x] `storage.go`: `slugify()` uses `currentDate()` as prefix; current format: `YYYY-MM-DD-{rand8}-{title-slug}`
 - [x] `process.go`: `applicationMeta` has `date` field; `currentDate()` called and stored in metadata
 - [x] `storage.go`: folder naming — `slugify(nodes)` extracts title from AST; format: `YYYY-MM-DD-{rand8}-{title-slug}`; `ErrExist` collision fallback appends `col`; every run produces a unique folder
-- [x] `process.go`: writes `resume.txt`, `cover.txt` (if cover), `meta.json`; `applicationMeta` written as JSON with company/role/score/tokens/date
+- [x] `process.go`: writes `resume.txt`, `cover.txt` (if cover), `meta.json`; `ApplicationMeta` written as JSON with company/role/score/tokens/date (struct moved to `storage.go` in Phase 4)
 
 ---
 
@@ -50,9 +50,9 @@
 - [x] `jdextract generate <url>` — fetch via jina.ai, process, save; print output dir
 - [x] `jdextract generate --local <file>` — read local file, process, save; print output dir
 - [x] `jdextract generate` (stdin) — read piped text from stdin; error with usage hint if stdin is a TTY
-- [ ] `jdextract list` — tabular output via `text/tabwriter`; skip corrupt `meta.json` with warning
-- [ ] `jdextract status <prefix> <status>` — folder prefix match, validate against `draft|applied|interviewing|offer|rejected`
-- [ ] `jdextract serve --port <port>` — pass root context into `Serve()` for graceful shutdown (default 8080)
+- [x] `jdextract list` — tabular output via `text/tabwriter`; skip corrupt `meta.json` with warning
+- [x] `jdextract status <prefix> <status>` — folder prefix match, validate against `draft|applied|interviewing|offer|rejected`
+- [ ] `jdextract serve --port <port>` — pass root context into `Serve()` for graceful shutdown (default 8080); subcommand slot reserved, exits with "not yet implemented"
 
 ---
 

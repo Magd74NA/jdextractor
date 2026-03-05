@@ -31,8 +31,8 @@ jdextract/
     ├── parse.go             # Line-level AST classifier; returns []JobDescriptionNode
     ├── llm.go               # DeepSeek HTTP client, retry logic
     ├── generate.go          # LLM orchestration: JSON encode → prompt → GenerateAll
-    ├── storage.go           # FS primitives: slugify, createApplicationDirectory, fetchResume, fetchCover
-    ├── process.go           # Orchestration: (a *App) Process(), applicationMeta struct
+    ├── storage.go           # FS primitives + ApplicationMeta type + ListJobs, UpdateJobStatus
+    ├── process.go           # Orchestration: (a *App) Process()
     └── web.go               # (Phase 5, not yet created) net/http server; accepts fs.FS from caller
 ```
 
@@ -66,15 +66,15 @@ Every run creates a "Run Folder" under the data directory, forming a searchable 
   "role": "Intermediate Copywriter",
   "score": 7,
   "tokens": 2847,
-  "date": "2026-02-24"
+  "date": "2026-02-24",
+  "status": "applied"
 }
 ```
 - **`company`**, **`role`**: Extracted by the LLM from the job description.
 - **`score`**: Integer 1–10 subjective fit rating from the LLM. Defaults to 0 on parse failure.
 - **`tokens`**: Total tokens used for the LLM call.
 - **`date`**: `YYYY-MM-DD` from `currentDate()`.
-
-Richer metadata (status tracking, URL storage, UUID-based IDs, notes sidecar) is deferred to Phase 4/5.
+- **`status`**: One of `draft | applied | interviewing | offer | rejected`. Omitted from JSON when empty (defaults to `draft` in display). Written by `jdextract status`.
 
 ## 5. System Components (The `jdextract` package)
 
@@ -184,9 +184,21 @@ func GenerateAll(
 ```
 
 ### `Storage` (storage.go)
-Pure filesystem primitives. No orchestration logic, no LLM calls.
+Filesystem primitives and job listing/status operations. No orchestration logic, no LLM calls.
 
 ```go
+// ApplicationMeta is the persisted metadata for a processed job application.
+// Dir is populated at read-time (not serialized to JSON).
+type ApplicationMeta struct {
+    Company string `json:"company"`
+    Role    string `json:"role"`
+    Score   int    `json:"score"`
+    Tokens  int    `json:"tokens"`
+    Date    string `json:"date"`
+    Status  string `json:"status,omitempty"`
+    Dir     string `json:"-"`
+}
+
 func currentDate() string  // returns YYYY-MM-DD via time.Now().Format
 
 // slugify derives a folder name from parsed AST nodes: prefers jina_title
@@ -201,22 +213,29 @@ func createApplicationDirectory(slug string, a *App) error
 
 func fetchResume(a *App) (string, error)  // reads config/templates/resume.txt
 func fetchCover(a *App) (string, error)   // reads config/templates/cover.txt
+
+// ListJobs reads all job directories, parses meta.json, and returns results
+// sorted by Date descending. Corrupt or missing meta.json entries are skipped
+// with a warning to stderr.
+func ListJobs(a *App) ([]ApplicationMeta, error)
+
+// PrintJobs writes a tabular listing to stdout via text/tabwriter.
+func PrintJobs(jobs []ApplicationMeta)
+
+// UpdateJobStatus finds a job by directory prefix, validates the status
+// against validStatuses, and rewrites meta.json. Errors if prefix is
+// ambiguous or matches nothing.
+func UpdateJobStatus(a *App, prefix, status string) error
 ```
 
 ### `Process` (process.go)
 Orchestrates the full pipeline: parse, load templates, call LLM, create directory, write files. Source-routing (URL vs local file vs stdin) is the CLI's concern — `Process` receives raw text directly.
 
 ```go
-type applicationMeta struct {
-    Company string `json:"company"`
-    Role    string `json:"role"`
-    Score   int    `json:"score"`
-    Tokens  int    `json:"tokens"`
-    Date    string `json:"date"`
-}
-
 func (a *App) Process(ctx context.Context, rawText string) (string, error)
 ```
+
+Uses `ApplicationMeta` from `storage.go` (moved there in Phase 4).
 
 **Process() workflow:**
 1. Parse raw text: `Parse(rawText)` → `[]JobDescriptionNode`
