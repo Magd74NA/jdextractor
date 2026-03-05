@@ -38,7 +38,7 @@ func slugify(nodes []JobDescriptionNode) string {
 	slug = st.Trim(slug, "-")
 
 	if slug == "" {
-		return prefix
+		return prefix + "-" + midfix
 	}
 	return prefix + "-" + midfix + "-" + slug
 }

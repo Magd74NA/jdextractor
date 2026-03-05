@@ -48,9 +48,8 @@
 
 - [x] `jdextract setup` — initialize portable directory structure and example templates
 - [x] `jdextract generate <url>` — fetch via jina.ai, process, save; print output dir
-- [ ] `jdextract generate --local <file>` — read local file, process, save; print output dir
-- [ ] `jdextract generate` (stdin) — read piped text from stdin; error with usage hint if stdin is a TTY
-- [ ] Error messages: missing API key; fetch failure prints tip to use `--local`
+- [x] `jdextract generate --local <file>` — read local file, process, save; print output dir
+- [x] `jdextract generate` (stdin) — read piped text from stdin; error with usage hint if stdin is a TTY
 - [ ] `jdextract list` — tabular output via `text/tabwriter`; skip corrupt `meta.json` with warning
 - [ ] `jdextract status <prefix> <status>` — folder prefix match, validate against `draft|applied|interviewing|offer|rejected`
 - [ ] `jdextract serve --port <port>` — pass root context into `Serve()` for graceful shutdown (default 8080)
