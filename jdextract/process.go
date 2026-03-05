@@ -6,7 +6,50 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
+
+const batchConcurrency = 10
+
+// BatchResult holds the outcome of a single URL in a batch run.
+type BatchResult struct {
+	URL string
+	Dir string
+	Err error
+}
+
+// ProcessBatch fetches and processes each URL concurrently (capped at batchConcurrency).
+// Results are streamed to the returned channel as they complete; the channel is closed
+// when all URLs are done. A failed URL does not affect the others.
+func (a *App) ProcessBatch(ctx context.Context, urls []string) <-chan BatchResult {
+	ch := make(chan BatchResult, len(urls))
+	sem := make(chan struct{}, batchConcurrency)
+	var wg sync.WaitGroup
+
+	for _, url := range urls {
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			raw, err := FetchJobDescription(ctx, url, &a.Client, 0)
+			if err != nil {
+				ch <- BatchResult{URL: url, Err: fmt.Errorf("fetch: %w", err)}
+				return
+			}
+			dir, err := a.Process(ctx, raw)
+			ch <- BatchResult{URL: url, Dir: dir, Err: err}
+		}(url)
+	}
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	return ch
+}
 
 func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 	nodes := Parse(rawText)

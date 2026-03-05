@@ -17,6 +17,7 @@ const usage = `jdextract — tailor resumes to job descriptions
 Usage:
   jdextract setup
   jdextract generate [--local] [<url-or-file>]
+  jdextract generate --batch <url> [<url> ...]
   jdextract list
   jdextract status <prefix> <status>
   jdextract serve [--port <port>]
@@ -112,9 +113,40 @@ func cmdSetup() {
 func cmdGenerate(args []string) {
 	fs := flag.NewFlagSet("generate", flag.ExitOnError)
 	local := fs.Bool("local", false, "Read job description from a local file instead of fetching via URL.")
+	batch := fs.Bool("batch", false, "Process multiple URLs concurrently (pass URLs as arguments).")
 	fs.Parse(args)
 
 	app := initAppWithConfig()
+
+	if *batch {
+		if *local {
+			fmt.Fprintln(os.Stderr, "error: --batch and --local are mutually exclusive")
+			os.Exit(1)
+		}
+		urls := fs.Args()
+		if len(urls) == 0 {
+			fmt.Fprintln(os.Stderr, "error: --batch requires at least one URL argument")
+			os.Exit(1)
+		}
+		ctx := context.Background()
+		total := len(urls)
+		done := 0
+		failed := 0
+		for r := range app.ProcessBatch(ctx, urls) {
+			done++
+			if r.Err != nil {
+				fmt.Fprintf(os.Stderr, "[%d/%d] error %s: %s\n", done, total, r.URL, r.Err)
+				failed++
+			} else {
+				fmt.Printf("[%d/%d] done: %s\n", done, total, r.Dir)
+			}
+		}
+		if failed > 0 {
+			fmt.Fprintf(os.Stderr, "%d/%d failed\n", failed, total)
+			os.Exit(1)
+		}
+		return
+	}
 
 	var raw string
 	var err error
