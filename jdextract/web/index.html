@@ -44,13 +44,65 @@
             </div>
         </div>
 
-        <div class="card bg-base-100 shadow-md">
+        <div class="card bg-base-100 shadow-md"
+             x-data="{
+                jobs: [],
+                loading: true,
+                error: null,
+                async init() {
+                    try {
+                        const res = await fetch('/api/jobs');
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        this.jobs = await res.json();
+                    } catch (e) {
+                        this.error = e.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+             }">
             <div class="card-body">
-                <h2 class="card-title text-2xl">Interactive Counter (Alpine.js)</h2>
-                <div class="flex items-center gap-4" x-data="{ count: 0 }">
-                    <button class="btn btn-circle btn-secondary" @click="count--">-</button>
-                    <span class="text-3xl font-bold" x-text="count"></span>
-                    <button class="btn btn-circle btn-accent" @click="count++">+</button>
+                <h2 class="card-title text-2xl">Applications</h2>
+
+                <div x-show="loading" class="flex justify-center py-4">
+                    <span class="loading loading-spinner loading-md"></span>
+                </div>
+
+                <div x-show="error" class="alert alert-error">
+                    <span x-text="error"></span>
+                </div>
+
+                <div x-show="!loading && !error && jobs.length === 0" class="text-base-content/50 py-4">
+                    No applications yet.
+                </div>
+
+                <div x-show="!loading && jobs.length > 0" class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Company</th>
+                                <th>Role</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="job in jobs" :key="job.date + job.company">
+                                <tr>
+                                    <td x-text="job.date"></td>
+                                    <td x-text="job.company"></td>
+                                    <td x-text="job.role"></td>
+                                    <td>
+                                        <span class="badge badge-neutral" x-text="job.score + '/10'"></span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-outline" x-text="job.status || 'draft'"></span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
