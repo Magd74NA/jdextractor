@@ -7,7 +7,9 @@ import (
 	"io"
 	"jdextract/jdextract"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 )
 
 const usage = `jdextract — tailor resumes to job descriptions
@@ -184,10 +186,17 @@ func cmdStatus(args []string) {
 
 func cmdServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	fs.Int("port", 8080, "Port to listen on.")
+	port := fs.Int("port", 8080, "Port to listen on.")
 	fs.Parse(args)
-	fmt.Fprintln(os.Stderr, "serve: not yet implemented (Phase 5)")
-	os.Exit(1)
+
+	app := initApp()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	if err := app.Serve(ctx, fmt.Sprintf("%d", *port)); err != nil {
+		fmt.Fprintf(os.Stderr, "serve error: %s\n", err)
+		os.Exit(1)
+	}
 }
 
 func boolPtr(b bool) *bool { return &b }
