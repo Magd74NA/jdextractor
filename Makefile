@@ -1,7 +1,7 @@
 
 .DEFAULT_GOAL := build
 
-.PHONY: fmt vet build clean run
+.PHONY: fmt vet build clean run snapshot
 
 clean:
 	go clean && rm -rf out/
@@ -17,3 +17,6 @@ build: vet
 
 run: build
 	./out/jdextractor
+
+snapshot:
+	goreleaser release --snapshot --clean
