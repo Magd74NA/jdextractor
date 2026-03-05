@@ -4,61 +4,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Page</title>
-    <!-- Tailwind CSS + DaisyUI via CDN -->
+    <title>JDExtractor</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Alpine.js via CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
-<body class="bg-base-200 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <div class="card bg-base-100 shadow-md" x-data="{
-                jobs: [],
-                loading: true,
-                error: null,
-                statuses: ['draft', 'applied', 'interviewing', 'offer', 'rejected'],
-                async init() {
-                    try {
-                        const res = await fetch('/api/jobs');
-                        if (!res.ok) throw new Error('HTTP ' + res.status);
-                        this.jobs = await res.json();
-                    } catch (e) {
-                        this.error = e.message;
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-                async updateStatus(job, status) {
-                    const res = await fetch('/api/jobs/' + job.dir, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ status }),
-                    });
-                    if (res.ok) job.status = status;
-                },
-                async deleteJob(job) {
-                    const res = await fetch('/api/jobs/' + job.dir, { method: 'DELETE' });
-                    if (res.ok) this.jobs = this.jobs.filter(j => j.dir !== job.dir);
-                }
-             }">
+<body class="bg-base-200 min-h-screen" x-data="app()">
+    <div class="container mx-auto px-4 py-8 max-w-4xl space-y-4">
+
+        <h1 class="text-3xl font-bold text-primary border-b-2 border-primary pb-2">JDExtractor</h1>
+
+        <!-- Single URL -->
+        <div class="card bg-base-100 shadow-md">
+            <div class="card-body py-3">
+                <button class="flex justify-between items-center w-full text-left"
+                        @click="singleOpen = !singleOpen">
+                    <span class="card-title text-lg">Process URL</span>
+                    <span x-text="singleOpen ? '▲' : '▼'" class="text-base-content/50 text-sm"></span>
+                </button>
+                <div x-show="singleOpen" class="mt-3 space-y-3">
+                    <input type="url" class="input input-bordered w-full"
+                           placeholder="https://jobs.example.com/..."
+                           x-model="singleURL" @keydown.enter="submitSingle()">
+                    <div class="flex items-center gap-3">
+                        <button class="btn btn-primary btn-sm" @click="submitSingle()"
+                                :disabled="singleLoading || !singleURL.trim()">
+                            <span x-show="singleLoading" class="loading loading-spinner loading-xs"></span>
+                            Generate
+                        </button>
+                        <span x-show="singleResult" class="text-success text-sm" x-text="'✓ ' + singleResult"></span>
+                        <span x-show="singleError" class="text-error text-sm" x-text="singleError"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch URLs -->
+        <div class="card bg-base-100 shadow-md">
+            <div class="card-body py-3">
+                <button class="flex justify-between items-center w-full text-left"
+                        @click="batchOpen = !batchOpen">
+                    <span class="card-title text-lg">Process Batch (URLs)</span>
+                    <span x-text="batchOpen ? '▲' : '▼'" class="text-base-content/50 text-sm"></span>
+                </button>
+                <div x-show="batchOpen" class="mt-3 space-y-3">
+                    <textarea class="textarea textarea-bordered w-full h-28 font-mono text-sm"
+                              placeholder="One URL per line"
+                              x-model="batchURLs"></textarea>
+                    <div class="flex items-center gap-3">
+                        <button class="btn btn-primary btn-sm" @click="submitBatch()"
+                                :disabled="batchLoading || !batchURLs.trim()">
+                            <span x-show="batchLoading" class="loading loading-spinner loading-xs"></span>
+                            Generate All
+                        </button>
+                        <span x-show="batchError" class="text-error text-sm" x-text="batchError"></span>
+                    </div>
+                    <template x-if="batchResults.length > 0">
+                        <ul class="text-sm space-y-1">
+                            <template x-for="r in batchResults" :key="r.url">
+                                <li>
+                                    <span x-show="!r.error" class="text-success">✓</span>
+                                    <span x-show="r.error" class="text-error">✗</span>
+                                    <span class="font-mono ml-1" x-text="r.url"></span>
+                                    <span x-show="r.error" class="text-error ml-1" x-text="'— ' + r.error"></span>
+                                </li>
+                            </template>
+                        </ul>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Local text -->
+        <div class="card bg-base-100 shadow-md">
+            <div class="card-body py-3">
+                <button class="flex justify-between items-center w-full text-left"
+                        @click="localOpen = !localOpen">
+                    <span class="card-title text-lg">Process Local Text</span>
+                    <span x-text="localOpen ? '▲' : '▼'" class="text-base-content/50 text-sm"></span>
+                </button>
+                <div x-show="localOpen" class="mt-3 space-y-3">
+                    <textarea class="textarea textarea-bordered w-full h-40 font-mono text-sm"
+                              placeholder="Paste the raw job description text here..."
+                              x-model="localContent"></textarea>
+                    <div class="flex items-center gap-3">
+                        <button class="btn btn-primary btn-sm" @click="submitLocal()"
+                                :disabled="localLoading || !localContent.trim()">
+                            <span x-show="localLoading" class="loading loading-spinner loading-xs"></span>
+                            Generate
+                        </button>
+                        <span x-show="localResult" class="text-success text-sm" x-text="'✓ ' + localResult"></span>
+                        <span x-show="localError" class="text-error text-sm" x-text="localError"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Applications table -->
+        <div class="card bg-base-100 shadow-md">
             <div class="card-body">
                 <h2 class="card-title text-2xl">Applications</h2>
 
-                <div x-show="loading" class="flex justify-center py-4">
+                <div x-show="jobsLoading" class="flex justify-center py-4">
                     <span class="loading loading-spinner loading-md"></span>
                 </div>
 
-                <div x-show="error" class="alert alert-error">
-                    <span x-text="error"></span>
+                <div x-show="jobsError" class="alert alert-error">
+                    <span x-text="jobsError"></span>
                 </div>
 
-                <div x-show="!loading && !error && jobs.length === 0" class="text-base-content/50 py-4">
+                <div x-show="!jobsLoading && !jobsError && jobs.length === 0" class="text-base-content/50 py-4">
                     No applications yet.
                 </div>
 
-                <div x-show="!loading && jobs.length > 0" class="overflow-x-auto">
+                <div x-show="!jobsLoading && jobs.length > 0" class="overflow-x-auto">
                     <table class="table table-zebra">
                         <thead>
                             <tr>
@@ -99,7 +159,138 @@
                 </div>
             </div>
         </div>
+
     </div>
+
+    <script>
+    function app() {
+        return {
+            // jobs table
+            jobs: [],
+            jobsLoading: true,
+            jobsError: null,
+            statuses: ['draft', 'applied', 'interviewing', 'offer', 'rejected'],
+
+            // single URL card
+            singleOpen: false,
+            singleURL: '',
+            singleLoading: false,
+            singleResult: null,
+            singleError: null,
+
+            // batch card
+            batchOpen: false,
+            batchURLs: '',
+            batchLoading: false,
+            batchResults: [],
+            batchError: null,
+
+            // local text card
+            localOpen: false,
+            localContent: '',
+            localLoading: false,
+            localResult: null,
+            localError: null,
+
+            async init() {
+                await this.loadJobs();
+            },
+
+            async loadJobs() {
+                this.jobsLoading = true;
+                this.jobsError = null;
+                try {
+                    const res = await fetch('/api/jobs');
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    this.jobs = await res.json();
+                } catch (e) {
+                    this.jobsError = e.message;
+                } finally {
+                    this.jobsLoading = false;
+                }
+            },
+
+            async updateStatus(job, status) {
+                const res = await fetch('/api/jobs/' + job.dir, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status }),
+                });
+                if (res.ok) job.status = status;
+            },
+
+            async deleteJob(job) {
+                const res = await fetch('/api/jobs/' + job.dir, { method: 'DELETE' });
+                if (res.ok) this.jobs = this.jobs.filter(j => j.dir !== job.dir);
+            },
+
+            async submitSingle() {
+                this.singleResult = null;
+                this.singleError = null;
+                this.singleLoading = true;
+                try {
+                    const res = await fetch('/api/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: this.singleURL.trim() }),
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    const data = await res.json();
+                    this.singleResult = data.dir;
+                    this.singleURL = '';
+                    await this.loadJobs();
+                } catch (e) {
+                    this.singleError = e.message;
+                } finally {
+                    this.singleLoading = false;
+                }
+            },
+
+            async submitBatch() {
+                this.batchResults = [];
+                this.batchError = null;
+                this.batchLoading = true;
+                const urls = this.batchURLs.split('\n').map(u => u.trim()).filter(Boolean);
+                try {
+                    const res = await fetch('/api/process/batch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ urls }),
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    this.batchResults = await res.json();
+                    await this.loadJobs();
+                } catch (e) {
+                    this.batchError = e.message;
+                } finally {
+                    this.batchLoading = false;
+                }
+            },
+
+            async submitLocal() {
+                this.localResult = null;
+                this.localError = null;
+                this.localLoading = true;
+                try {
+                    const res = await fetch('/api/process/local', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: this.localContent }),
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    const data = await res.json();
+                    this.localResult = data.dir;
+                    this.localContent = '';
+                    await this.loadJobs();
+                } catch (e) {
+                    this.localError = e.message;
+                } finally {
+                    this.localLoading = false;
+                }
+            },
+        };
+    }
+    </script>
 </body>
 
 </html>

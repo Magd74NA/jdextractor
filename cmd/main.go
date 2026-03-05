@@ -221,7 +221,7 @@ func cmdServe(args []string) {
 	port := fs.Int("port", 8080, "Port to listen on.")
 	fs.Parse(args)
 
-	app := initApp()
+	app := initAppWithConfig()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 

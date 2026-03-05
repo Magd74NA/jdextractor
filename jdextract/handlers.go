@@ -15,6 +15,9 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/jobs", a.handleListJobs)
 	mux.HandleFunc("PATCH /api/jobs/{id}", a.handleUpdateJobStatus)
 	mux.HandleFunc("DELETE /api/jobs/{id}", a.handleDeleteJob)
+	mux.HandleFunc("POST /api/process", a.handleProcess)
+	mux.HandleFunc("POST /api/process/batch", a.handleProcessBatch)
+	mux.HandleFunc("POST /api/process/local", a.handleProcessLocal)
 }
 
 // jobResponse is the wire type for GET /api/jobs. It embeds ApplicationMeta
@@ -65,6 +68,82 @@ func (a *App) handleDeleteJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleProcess fetches a job description from a URL via jina.ai and runs the
+// full generation pipeline, returning {"dir":"..."} on success.
+func (a *App) handleProcess(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.URL == "" {
+		http.Error(w, "invalid JSON body: url required", http.StatusBadRequest)
+		return
+	}
+	raw, err := FetchJobDescription(r.Context(), body.URL, &a.Client, 0)
+	if err != nil {
+		http.Error(w, "fetch error: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	dir, err := a.Process(r.Context(), raw)
+	if err != nil {
+		http.Error(w, "process error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct {
+		Dir string `json:"dir"`
+	}{Dir: dir})
+}
+
+// batchItemResult is the per-URL outcome returned by handleProcessBatch.
+type batchItemResult struct {
+	URL   string `json:"url"`
+	Dir   string `json:"dir,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
+// handleProcessBatch accepts {"urls":[...]} and processes all URLs concurrently,
+// returning an array of per-URL outcomes. Individual failures do not abort others.
+func (a *App) handleProcessBatch(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URLs []string `json:"urls"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.URLs) == 0 {
+		http.Error(w, "invalid JSON body: urls required", http.StatusBadRequest)
+		return
+	}
+	var results []batchItemResult
+	for br := range a.ProcessBatch(r.Context(), body.URLs) {
+		res := batchItemResult{URL: br.URL, Dir: br.Dir}
+		if br.Err != nil {
+			res.Error = br.Err.Error()
+		}
+		results = append(results, res)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+// handleProcessLocal accepts {"content":"..."} (raw job description text) and
+// runs the generation pipeline directly, returning {"dir":"..."} on success.
+func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" {
+		http.Error(w, "invalid JSON body: content required", http.StatusBadRequest)
+		return
+	}
+	dir, err := a.Process(r.Context(), body.Content)
+	if err != nil {
+		http.Error(w, "process error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct {
+		Dir string `json:"dir"`
+	}{Dir: dir})
 }
 
 // handleIndex serves the embedded web UI.
