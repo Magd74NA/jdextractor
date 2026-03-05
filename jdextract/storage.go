@@ -144,6 +144,18 @@ func FormatJobs(jobs []ApplicationMeta) string {
 	return buf.String()
 }
 
+// DeleteJob removes a job directory and all its contents by exact directory name.
+func DeleteJob(a *App, dir string) error {
+	if dir == "" || dir == "." || st.Contains(dir, "/") || st.Contains(dir, "\\") {
+		return fmt.Errorf("invalid job id %q", dir)
+	}
+	path := filepath.Join(a.Paths.Jobs, dir)
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("job not found: %q", dir)
+	}
+	return os.RemoveAll(path)
+}
+
 // UpdateJobStatus finds a job by directory prefix and updates its status in meta.json.
 func UpdateJobStatus(a *App, prefix, status string) error {
 	if !slices.Contains(validStatuses, status) {

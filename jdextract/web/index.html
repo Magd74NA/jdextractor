@@ -12,43 +12,13 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
-<body class="bg-base-200 min-h-screen" x-data="{ showLinks: true }">
+<body class="bg-base-200 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <h1 class="text-4xl font-bold text-primary mb-6 border-b-2 border-primary pb-2">
-            JDExtractor Test Page
-        </h1>
-
-        <div class="card bg-base-100 shadow-md mb-6">
-            <div class="card-body">
-                <h2 class="card-title text-2xl">Welcome!</h2>
-                <p>This is a simple test page for the JDExtractor project.</p>
-                <p class="text-success font-semibold">✓ HTML page loaded successfully!</p>
-                <p class="text-info">✓ Tailwind CSS + DaisyUI loaded!</p>
-                <p class="text-warning">✓ Alpine.js loaded!</p>
-            </div>
-        </div>
-
-        <div class="card bg-base-100 shadow-md mb-6">
-            <div class="card-body">
-                <div class="flex justify-between items-center">
-                    <h2 class="card-title text-2xl">Quick Links</h2>
-                    <button class="btn btn-primary btn-sm" @click="showLinks = !showLinks">
-                        <span x-text="showLinks ? 'Hide' : 'Show'"></span>
-                    </button>
-                </div>
-                <ul x-show="showLinks" x-transition class="menu bg-base-200 rounded-lg mt-4">
-                    <li><a href="#" class="hover:bg-primary hover:text-primary-content">Home</a></li>
-                    <li><a href="#" class="hover:bg-primary hover:text-primary-content">About</a></li>
-                    <li><a href="#" class="hover:bg-primary hover:text-primary-content">Contact</a></li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="card bg-base-100 shadow-md"
-             x-data="{
+        <div class="card bg-base-100 shadow-md" x-data="{
                 jobs: [],
                 loading: true,
                 error: null,
+                statuses: ['draft', 'applied', 'interviewing', 'offer', 'rejected'],
                 async init() {
                     try {
                         const res = await fetch('/api/jobs');
@@ -59,6 +29,18 @@
                     } finally {
                         this.loading = false;
                     }
+                },
+                async updateStatus(job, status) {
+                    const res = await fetch('/api/jobs/' + job.dir, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status }),
+                    });
+                    if (res.ok) job.status = status;
+                },
+                async deleteJob(job) {
+                    const res = await fetch('/api/jobs/' + job.dir, { method: 'DELETE' });
+                    if (res.ok) this.jobs = this.jobs.filter(j => j.dir !== job.dir);
                 }
              }">
             <div class="card-body">
@@ -80,15 +62,16 @@
                     <table class="table table-zebra">
                         <thead>
                             <tr>
-                                <th>Date</th>
+                                <th class="min-w-28">Date</th>
                                 <th>Company</th>
                                 <th>Role</th>
                                 <th>Score</th>
                                 <th>Status</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="job in jobs" :key="job.date + job.company">
+                            <template x-for="job in jobs" :key="job.dir">
                                 <tr>
                                     <td x-text="job.date"></td>
                                     <td x-text="job.company"></td>
@@ -97,7 +80,17 @@
                                         <span class="badge badge-neutral" x-text="job.score + '/10'"></span>
                                     </td>
                                     <td>
-                                        <span class="badge badge-outline" x-text="job.status || 'draft'"></span>
+                                        <select class="select select-xs select-bordered"
+                                                :value="job.status || 'draft'"
+                                                @change="updateStatus(job, $event.target.value)">
+                                            <template x-for="s in statuses" :key="s">
+                                                <option :value="s" :selected="(job.status || 'draft') === s" x-text="s"></option>
+                                            </template>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-xs btn-error btn-outline"
+                                                @click="deleteJob(job)">Delete</button>
                                     </td>
                                 </tr>
                             </template>
