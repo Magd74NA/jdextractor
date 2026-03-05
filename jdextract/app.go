@@ -65,10 +65,10 @@ func getPortablePaths() (PortablePaths, error) {
 	return paths, nil
 }
 
-func NewApp(setup *bool) (*App, error) {
+func NewApp(setup *bool) (*App, error, bool) {
 	paths, err := getPortablePaths()
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 	app := &App{
 		Paths: paths,
@@ -77,8 +77,9 @@ func NewApp(setup *bool) (*App, error) {
 	if *setup {
 		err = app.Setup()
 		if err != nil {
-			return nil, err
+			return nil, err, false
 		}
+		return app, nil, true
 	}
-	return app, nil
+	return app, nil, false
 }

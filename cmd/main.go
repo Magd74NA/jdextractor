@@ -12,8 +12,12 @@ import (
 func main() {
 
 	setup := flag.Bool("setup", false, "This flag is for running the setup for portable mode.")
+
 	flag.Parse()
-	app, err := jdextract.NewApp(setup)
+	app, err, setupComplete := jdextract.NewApp(setup)
+	if setupComplete {
+		os.Exit(0)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "setup error: %s\n", err)
 		os.Exit(1)
