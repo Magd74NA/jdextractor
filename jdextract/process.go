@@ -8,14 +8,6 @@ import (
 	"path/filepath"
 )
 
-type applicationMeta struct {
-	Company string `json:"company"`
-	Role    string `json:"role"`
-	Score   int    `json:"score"`
-	Tokens  int    `json:"tokens"`
-	Date    string `json:"date"`
-}
-
 func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 	nodes := Parse(rawText)
 
@@ -60,7 +52,7 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 
 	date := currentDate()
 
-	meta := applicationMeta{Company: company, Role: role, Score: score, Tokens: tokens, Date: date}
+	meta := ApplicationMeta{Company: company, Role: role, Score: score, Tokens: tokens, Date: date}
 	metaBytes, err := json.Marshal(meta)
 	if err != nil {
 		return "", fmt.Errorf("marshal meta: %w", err)
