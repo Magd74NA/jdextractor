@@ -344,7 +344,12 @@
                 try {
                     const res = await fetch('/api/config');
                     if (!res.ok) throw new Error('HTTP ' + res.status);
-                    this.config = await res.json();
+                    const data = await res.json();
+                    this.config = {
+                        deepseek_api_key: data.deepseek_api_key || '',
+                        deepseek_model: data.deepseek_model || 'deepseek-chat',
+                        port: data.port || 8080,
+                    };
                 } catch (e) {
                     // non-fatal — defaults remain
                 }
