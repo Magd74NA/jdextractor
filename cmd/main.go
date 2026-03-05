@@ -22,7 +22,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "setup error: %s\n", err)
 		os.Exit(1)
 	}
-
+	target := os.Args[1]
 	configPath := filepath.Join(app.Paths.Config, "config.json")
 	conf, err := os.Open(configPath)
 	if err != nil {
@@ -53,13 +53,13 @@ func main() {
 	}
 	app.Client = *client
 
-	raw, err := os.ReadFile(filepath.Join(app.Paths.Root, "test_jd.md"))
+	raw, err := jdextract.FetchJobDescription(context.Background(), target, &app.Client, 0)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "read test_jd.md: %s\n", err)
+		fmt.Fprintf(os.Stderr, "fetch error: %s\n", err)
 		os.Exit(1)
 	}
 
-	dir, err := app.Process(context.Background(), string(raw))
+	dir, err := app.Process(context.Background(), raw)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "process error: %s\n", err)
 		os.Exit(1)
