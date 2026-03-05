@@ -3,9 +3,12 @@ package jdextract
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 //go:embed web/index.html
@@ -16,12 +19,123 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", a.handleIndex)
 	mux.HandleFunc("GET /api/config", a.handleGetConfig)
 	mux.HandleFunc("PATCH /api/config", a.handleUpdateConfig)
+	mux.HandleFunc("GET /api/templates", a.handleGetTemplates)
+	mux.HandleFunc("PATCH /api/templates", a.handleSaveTemplates)
+	mux.HandleFunc("GET /api/jobs/{id}/files", a.handleGetJobFiles)
+	mux.HandleFunc("PATCH /api/jobs/{id}/files", a.handleSaveJobFiles)
 	mux.HandleFunc("GET /api/jobs", a.handleListJobs)
 	mux.HandleFunc("PATCH /api/jobs/{id}", a.handleUpdateJobStatus)
 	mux.HandleFunc("DELETE /api/jobs/{id}", a.handleDeleteJob)
 	mux.HandleFunc("POST /api/process", a.handleProcess)
 	mux.HandleFunc("POST /api/process/batch", a.handleProcessBatch)
 	mux.HandleFunc("POST /api/process/local", a.handleProcessLocal)
+}
+
+// handleGetTemplates returns the current resume and cover letter templates.
+func (a *App) handleGetTemplates(w http.ResponseWriter, r *http.Request) {
+	out := struct {
+		Resume string `json:"resume"`
+		Cover  string `json:"cover,omitempty"`
+	}{}
+	if b, err := os.ReadFile(filepath.Join(a.Paths.Templates, "resume.txt")); err == nil {
+		out.Resume = string(b)
+	}
+	if b, err := os.ReadFile(filepath.Join(a.Paths.Templates, "cover.txt")); err == nil {
+		out.Cover = string(b)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+// handleSaveTemplates writes resume.txt and/or cover.txt to the templates directory.
+// Only non-nil fields in the body are written.
+func (a *App) handleSaveTemplates(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Resume *string `json:"resume"`
+		Cover  *string `json:"cover"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if body.Resume != nil {
+		if err := os.WriteFile(filepath.Join(a.Paths.Templates, "resume.txt"), []byte(*body.Resume), 0644); err != nil {
+			http.Error(w, "write resume template: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if body.Cover != nil {
+		if err := os.WriteFile(filepath.Join(a.Paths.Templates, "cover.txt"), []byte(*body.Cover), 0644); err != nil {
+			http.Error(w, "write cover template: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleGetJobFiles returns the resume and (optionally) cover letter content
+// for a job identified by its exact directory name.
+func (a *App) handleGetJobFiles(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" || id == "." || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+		http.Error(w, "invalid job id", http.StatusBadRequest)
+		return
+	}
+	dir := filepath.Join(a.Paths.Jobs, id)
+
+	resumeBytes, err := os.ReadFile(filepath.Join(dir, "resume.txt"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			http.Error(w, "job not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "read error: "+err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	out := struct {
+		Resume string `json:"resume"`
+		Cover  string `json:"cover,omitempty"`
+	}{Resume: string(resumeBytes)}
+
+	if coverBytes, err := os.ReadFile(filepath.Join(dir, "cover.txt")); err == nil {
+		out.Cover = string(coverBytes)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+// handleSaveJobFiles writes resume.txt and/or cover.txt for a job.
+// Only non-empty fields in the body are written; omitted fields are left untouched.
+func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" || id == "." || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+		http.Error(w, "invalid job id", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		Resume *string `json:"resume"`
+		Cover  *string `json:"cover"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	dir := filepath.Join(a.Paths.Jobs, id)
+	if body.Resume != nil {
+		if err := os.WriteFile(filepath.Join(dir, "resume.txt"), []byte(*body.Resume), 0644); err != nil {
+			http.Error(w, "write resume: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if body.Cover != nil {
+		if err := os.WriteFile(filepath.Join(dir, "cover.txt"), []byte(*body.Cover), 0644); err != nil {
+			http.Error(w, "write cover: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 var validModels = []string{"deepseek-chat", "deepseek-reasoner"}

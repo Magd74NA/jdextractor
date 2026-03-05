@@ -70,6 +70,44 @@
             </div>
         </div>
 
+        <!-- Templates -->
+        <div class="card bg-base-100 shadow-md">
+            <div class="card-body py-3">
+                <button class="flex justify-between items-center w-full text-left"
+                        @click="templatesOpen = !templatesOpen; if(templatesOpen && tmpl.resume === undefined) loadTemplates()">
+                    <span class="card-title text-lg">Templates</span>
+                    <span x-text="templatesOpen ? '▲' : '▼'" class="text-base-content/50 text-sm"></span>
+                </button>
+                <div x-show="templatesOpen" class="mt-3 space-y-4">
+                    <div x-show="tmplLoading" class="flex justify-center py-3">
+                        <span class="loading loading-spinner loading-sm"></span>
+                    </div>
+                    <div x-show="!tmplLoading" class="space-y-4">
+                        <div>
+                            <p class="font-semibold text-sm mb-1">Resume Template</p>
+                            <textarea class="textarea textarea-bordered w-full h-64 font-mono text-xs"
+                                      placeholder="Paste your base resume here..."
+                                      x-model="tmpl.resume"></textarea>
+                            <div class="flex items-center gap-2 mt-1">
+                                <button class="btn btn-sm btn-primary" @click="saveTemplate('resume')">Save</button>
+                                <span x-show="tmplResumeSaved" class="text-success text-sm">✓ Saved</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-sm mb-1">Cover Letter Template</p>
+                            <textarea class="textarea textarea-bordered w-full h-48 font-mono text-xs"
+                                      placeholder="Paste your base cover letter here (optional)..."
+                                      x-model="tmpl.cover"></textarea>
+                            <div class="flex items-center gap-2 mt-1">
+                                <button class="btn btn-sm btn-primary" @click="saveTemplate('cover')">Save</button>
+                                <span x-show="tmplCoverSaved" class="text-success text-sm">✓ Saved</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Single URL -->
         <div class="card bg-base-100 shadow-md">
             <div class="card-body py-3">
@@ -183,10 +221,11 @@
                                 <th>Score</th>
                                 <th>Status</th>
                                 <th></th>
+                                <th></th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <template x-for="job in jobs" :key="job.dir">
+                        <template x-for="job in jobs" :key="job.dir">
+                            <tbody>
                                 <tr>
                                     <td x-text="job.date"></td>
                                     <td x-text="job.company"></td>
@@ -204,12 +243,46 @@
                                         </select>
                                     </td>
                                     <td>
+                                        <button class="btn btn-xs btn-ghost"
+                                                @click="openFiles(job)"
+                                                x-text="job.open ? '▲' : '▼'"></button>
+                                    </td>
+                                    <td>
                                         <button class="btn btn-xs btn-error btn-outline"
                                                 @click="deleteJob(job)">Delete</button>
                                     </td>
                                 </tr>
-                            </template>
-                        </tbody>
+                                <tr x-show="job.open">
+                                    <td colspan="7" class="bg-base-200 p-4">
+                                        <div x-show="job.filesLoading" class="flex justify-center py-3">
+                                            <span class="loading loading-spinner loading-sm"></span>
+                                        </div>
+                                        <div x-show="!job.filesLoading" class="space-y-4">
+                                            <div>
+                                                <p class="font-semibold text-sm mb-1">Resume</p>
+                                                <textarea class="textarea textarea-bordered w-full h-48 font-mono text-xs"
+                                                          x-model="job.resume"></textarea>
+                                                <div class="flex items-center gap-2 mt-1">
+                                                    <button class="btn btn-sm btn-primary"
+                                                            @click="saveFile(job, 'resume')">Save</button>
+                                                    <span x-show="job.resumeSaved" class="text-success text-sm">✓ Saved</span>
+                                                </div>
+                                            </div>
+                                            <div x-show="job.cover !== null">
+                                                <p class="font-semibold text-sm mb-1">Cover Letter</p>
+                                                <textarea class="textarea textarea-bordered w-full h-48 font-mono text-xs"
+                                                          x-model="job.cover"></textarea>
+                                                <div class="flex items-center gap-2 mt-1">
+                                                    <button class="btn btn-sm btn-primary"
+                                                            @click="saveFile(job, 'cover')">Save</button>
+                                                    <span x-show="job.coverSaved" class="text-success text-sm">✓ Saved</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </template>
                     </table>
                 </div>
             </div>
@@ -233,6 +306,13 @@
             jobsLoading: true,
             jobsError: null,
             statuses: ['draft', 'applied', 'interviewing', 'offer', 'rejected'],
+
+            // templates card
+            templatesOpen: false,
+            tmpl: { resume: undefined, cover: '' },
+            tmplLoading: false,
+            tmplResumeSaved: false,
+            tmplCoverSaved: false,
 
             // single URL card
             singleOpen: false,
@@ -290,13 +370,80 @@
                 }
             },
 
+            async loadTemplates() {
+                this.tmplLoading = true;
+                try {
+                    const res = await fetch('/api/templates');
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const data = await res.json();
+                    this.tmpl.resume = data.resume ?? '';
+                    this.tmpl.cover = data.cover ?? '';
+                } catch (e) {
+                    this.tmpl.resume = '';
+                } finally {
+                    this.tmplLoading = false;
+                }
+            },
+
+            async saveTemplate(type) {
+                const body = type === 'resume' ? { resume: this.tmpl.resume } : { cover: this.tmpl.cover };
+                await fetch('/api/templates', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (type === 'resume') {
+                    this.tmplResumeSaved = true;
+                    setTimeout(() => { this.tmplResumeSaved = false; }, 3000);
+                } else {
+                    this.tmplCoverSaved = true;
+                    setTimeout(() => { this.tmplCoverSaved = false; }, 3000);
+                }
+            },
+
+            async saveFile(job, type) {
+                const body = type === 'resume' ? { resume: job.resume } : { cover: job.cover };
+                await fetch('/api/jobs/' + job.dir + '/files', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (type === 'resume') {
+                    job.resumeSaved = true;
+                    setTimeout(() => { job.resumeSaved = false; }, 3000);
+                } else {
+                    job.coverSaved = true;
+                    setTimeout(() => { job.coverSaved = false; }, 3000);
+                }
+            },
+
+            async openFiles(job) {
+                job.open = !job.open;
+                if (job.open && job.resume === undefined) {
+                    job.filesLoading = true;
+                    try {
+                        const res = await fetch('/api/jobs/' + job.dir + '/files');
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        const data = await res.json();
+                        job.resume = data.resume ?? null;
+                        job.cover = data.cover ?? null;
+                    } catch (e) {
+                        job.resume = null;
+                        job.cover = null;
+                    } finally {
+                        job.filesLoading = false;
+                    }
+                }
+            },
+
             async loadJobs() {
                 this.jobsLoading = true;
                 this.jobsError = null;
                 try {
                     const res = await fetch('/api/jobs');
                     if (!res.ok) throw new Error('HTTP ' + res.status);
-                    this.jobs = await res.json();
+                    const raw = await res.json();
+                    this.jobs = raw.map(j => ({ ...j, open: false, filesLoading: false, resume: undefined, cover: undefined, resumeSaved: false, coverSaved: false }));
                 } catch (e) {
                     this.jobsError = e.message;
                 } finally {
