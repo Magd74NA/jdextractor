@@ -169,7 +169,7 @@ func cmdList() {
 		fmt.Println("No jobs found.")
 		return
 	}
-	jdextract.PrintJobs(jobs)
+	fmt.Print(jdextract.FormatJobs(jobs))
 }
 
 func cmdStatus(args []string) {

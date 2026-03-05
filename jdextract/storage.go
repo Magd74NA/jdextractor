@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	st "strings"
 	"text/tabwriter"
@@ -127,9 +128,10 @@ func ListJobs(a *App) ([]ApplicationMeta, error) {
 	return jobs, nil
 }
 
-// PrintJobs writes a tabular listing of jobs to stdout.
-func PrintJobs(jobs []ApplicationMeta) string {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+// FormatJobs returns a tabular string listing of jobs.
+func FormatJobs(jobs []ApplicationMeta) string {
+	var buf st.Builder
+	w := tabwriter.NewWriter(&buf, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "DATE\tCOMPANY\tROLE\tSCORE\tSTATUS\tDIR")
 	for _, j := range jobs {
 		status := j.Status
@@ -139,18 +141,12 @@ func PrintJobs(jobs []ApplicationMeta) string {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n", j.Date, j.Company, j.Role, j.Score, status, j.Dir)
 	}
 	w.Flush()
+	return buf.String()
 }
 
 // UpdateJobStatus finds a job by directory prefix and updates its status in meta.json.
 func UpdateJobStatus(a *App, prefix, status string) error {
-	valid := false
-	for _, s := range validStatuses {
-		if s == status {
-			valid = true
-			break
-		}
-	}
-	if !valid {
+	if !slices.Contains(validStatuses, status) {
 		return fmt.Errorf("invalid status %q: must be one of %s", status, st.Join(validStatuses, ", "))
 	}
 
