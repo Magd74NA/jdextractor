@@ -65,7 +65,7 @@ func getPortablePaths() (PortablePaths, error) {
 	return paths, nil
 }
 
-func NewApp() (*App, error) {
+func NewApp(setup *bool) (*App, error) {
 	paths, err := getPortablePaths()
 	if err != nil {
 		return nil, err
@@ -74,10 +74,11 @@ func NewApp() (*App, error) {
 		Paths: paths,
 	}
 
-	err = app.Setup()
-
-	if err != nil {
-		return nil, err
+	if *setup {
+		err = app.Setup()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return app, nil
 }

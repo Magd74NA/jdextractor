@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"jdextract/jdextract"
 	"os"
@@ -9,7 +10,10 @@ import (
 )
 
 func main() {
-	app, err := jdextract.NewApp()
+
+	setup := flag.Bool("setup", false, "This flag is for running the setup for portable mode.")
+	flag.Parse()
+	app, err := jdextract.NewApp(setup)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "setup error: %s\n", err)
 		os.Exit(1)

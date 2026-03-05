@@ -46,8 +46,7 @@
 
 ## Phase 4: CLI Interface
 
-- [ ] `cmd/main.go`: `flag.NewFlagSet` per subcommand; root context via `signal.NotifyContext(os.Interrupt, SIGTERM)`
-- [ ] `jdextract setup` — initialize portable directory structure and example templates
+- [x] `jdextract setup` — initialize portable directory structure and example templates
 - [ ] `jdextract generate <url>` — fetch via jina.ai, process, save; print output dir
 - [ ] `jdextract generate --local <file>` — read local file, process, save; print output dir
 - [ ] `jdextract generate` (stdin) — read piped text from stdin; error with usage hint if stdin is a TTY
