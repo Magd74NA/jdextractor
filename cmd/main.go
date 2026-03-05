@@ -35,8 +35,8 @@ Subcommands:
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprint(os.Stderr, usage)
-		os.Exit(1)
+		cmdServe([]string{})
+		return
 	}
 
 	switch os.Args[1] {
@@ -216,12 +216,42 @@ func cmdStatus(args []string) {
 	}
 }
 
+// initAppForServe loads paths and config (if it exists) without failing on a
+// missing or unconfigured API key. The HTTP client is initialised best-effort.
+// Serve() itself calls Setup() to create dirs and an empty config if needed.
+func initAppForServe() *jdextract.App {
+	app := initApp()
+	configPath := filepath.Join(app.Paths.Config, "config.json")
+	if conf, err := os.Open(configPath); err == nil {
+		config, err := jdextract.LoadConfig(conf)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "config load error: %s\n", err)
+			os.Exit(1)
+		}
+		app.Config = *config
+	}
+	if client, err := jdextract.InitiateClient(); err == nil {
+		app.Client = *client
+	}
+	return app
+}
+
 func cmdServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fs.Int("port", 8080, "Port to listen on.")
 	fs.Parse(args)
 
-	app := initAppWithConfig()
+	app := initAppForServe()
+	// Prefer config port unless --port was explicitly passed on the command line.
+	portExplicit := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "port" {
+			portExplicit = true
+		}
+	})
+	if !portExplicit && app.Config.Port != 0 {
+		*port = app.Config.Port
+	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 

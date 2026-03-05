@@ -4,6 +4,8 @@ import (
 	"embed"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
+	"slices"
 )
 
 //go:embed web/index.html
@@ -12,12 +14,55 @@ var webFiles embed.FS
 // registerRoutes attaches all HTTP handlers to mux.
 func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", a.handleIndex)
+	mux.HandleFunc("GET /api/config", a.handleGetConfig)
+	mux.HandleFunc("PATCH /api/config", a.handleUpdateConfig)
 	mux.HandleFunc("GET /api/jobs", a.handleListJobs)
 	mux.HandleFunc("PATCH /api/jobs/{id}", a.handleUpdateJobStatus)
 	mux.HandleFunc("DELETE /api/jobs/{id}", a.handleDeleteJob)
 	mux.HandleFunc("POST /api/process", a.handleProcess)
 	mux.HandleFunc("POST /api/process/batch", a.handleProcessBatch)
 	mux.HandleFunc("POST /api/process/local", a.handleProcessLocal)
+}
+
+var validModels = []string{"deepseek-chat", "deepseek-reasoner"}
+
+// handleGetConfig returns the current in-memory Config as JSON.
+func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(a.Config)
+}
+
+// handleUpdateConfig applies a partial config update, persists it to disk, and
+// updates the in-memory Config. Only non-nil fields in the body are applied.
+func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		DeepSeekApiKey *string `json:"deepseek_api_key"`
+		DeepSeekModel  *string `json:"deepseek_model"`
+		Port           *int    `json:"port"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if body.DeepSeekModel != nil && !slices.Contains(validModels, *body.DeepSeekModel) {
+		http.Error(w, "invalid model: must be deepseek-chat or deepseek-reasoner", http.StatusBadRequest)
+		return
+	}
+	if body.DeepSeekApiKey != nil {
+		a.Config.DeepSeekApiKey = *body.DeepSeekApiKey
+	}
+	if body.DeepSeekModel != nil {
+		a.Config.DeepSeekModel = *body.DeepSeekModel
+	}
+	if body.Port != nil {
+		a.Config.Port = *body.Port
+	}
+	path := filepath.Join(a.Paths.Config, "config.json")
+	if err := SaveConfig(path, a.Config); err != nil {
+		http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // jobResponse is the wire type for GET /api/jobs. It embeds ApplicationMeta

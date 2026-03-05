@@ -41,6 +41,15 @@ func CreateEmptyConfig(path string) error {
 	return nil
 }
 
+// SaveConfig writes cfg to path as indented JSON with 0600 permissions.
+func SaveConfig(path string, cfg Config) error {
+	data, err := json.MarshalIndent(cfg, "", "\t")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
+}
+
 // LoadConfig reads and JSON-decodes a Config from an open file.
 // The caller is responsible for opening the file; LoadConfig closes it.
 func LoadConfig(f *os.File) (*Config, error) {

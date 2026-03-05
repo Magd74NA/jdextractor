@@ -15,6 +15,61 @@
 
         <h1 class="text-3xl font-bold text-primary border-b-2 border-primary pb-2">JDExtractor</h1>
 
+        <!-- Configuration -->
+        <div class="card bg-base-100 shadow-md">
+            <div class="card-body py-3">
+                <button class="flex justify-between items-center w-full text-left"
+                        @click="configOpen = !configOpen">
+                    <span class="card-title text-lg">Configuration</span>
+                    <span x-text="configOpen ? '▲' : '▼'" class="text-base-content/50 text-sm"></span>
+                </button>
+                <div x-show="configOpen" class="mt-3 space-y-4">
+
+                    <!-- Model -->
+                    <div class="form-control space-y-1">
+                        <label class="label pb-0"><span class="label-text font-medium">Model</span></label>
+                        <select class="select select-bordered w-full" x-model="config.deepseek_model">
+                            <option value="deepseek-chat">deepseek-chat — fast &amp; cheap (recommended for 90% of use cases)</option>
+                            <option value="deepseek-reasoner">deepseek-reasoner — smarter but slower and costs more</option>
+                        </select>
+                    </div>
+
+                    <!-- API Key -->
+                    <div class="form-control space-y-1">
+                        <label class="label pb-0"><span class="label-text font-medium">DeepSeek API Key</span></label>
+                        <div class="flex gap-2">
+                            <input class="input input-bordered flex-1 font-mono text-sm"
+                                   :type="showApiKey ? 'text' : 'password'"
+                                   placeholder="sk-..."
+                                   x-model="config.deepseek_api_key">
+                            <button class="btn btn-ghost btn-sm self-center"
+                                    @click="showApiKey = !showApiKey"
+                                    x-text="showApiKey ? 'Hide' : 'Show'"></button>
+                        </div>
+                    </div>
+
+                    <!-- Port -->
+                    <div class="form-control space-y-1">
+                        <label class="label pb-0"><span class="label-text font-medium">Port</span></label>
+                        <input type="number" class="input input-bordered w-32"
+                               x-model.number="config.port">
+                        <p class="text-xs text-base-content/50">Port changes require a server restart.</p>
+                    </div>
+
+                    <!-- Save -->
+                    <div class="flex items-center gap-3">
+                        <button class="btn btn-primary btn-sm" @click="saveConfig()"
+                                :disabled="configSaving">
+                            <span x-show="configSaving" class="loading loading-spinner loading-xs"></span>
+                            Save
+                        </button>
+                        <span x-show="configSaved" class="text-success text-sm">✓ Saved</span>
+                        <span x-show="configError" class="text-error text-sm" x-text="configError"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Single URL -->
         <div class="card bg-base-100 shadow-md">
             <div class="card-body py-3">
@@ -165,6 +220,14 @@
     <script>
     function app() {
         return {
+            // config card
+            configOpen: false,
+            config: { deepseek_api_key: '', deepseek_model: 'deepseek-chat', port: 8080 },
+            configSaving: false,
+            configSaved: false,
+            configError: null,
+            showApiKey: false,
+
             // jobs table
             jobs: [],
             jobsLoading: true,
@@ -193,7 +256,38 @@
             localError: null,
 
             async init() {
+                await this.loadConfig();
                 await this.loadJobs();
+            },
+
+            async loadConfig() {
+                try {
+                    const res = await fetch('/api/config');
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    this.config = await res.json();
+                } catch (e) {
+                    // non-fatal — defaults remain
+                }
+            },
+
+            async saveConfig() {
+                this.configSaved = false;
+                this.configError = null;
+                this.configSaving = true;
+                try {
+                    const res = await fetch('/api/config', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.config),
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    this.configSaved = true;
+                    setTimeout(() => { this.configSaved = false; }, 3000);
+                } catch (e) {
+                    this.configError = e.message;
+                } finally {
+                    this.configSaving = false;
+                }
             },
 
             async loadJobs() {

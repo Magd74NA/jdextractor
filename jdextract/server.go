@@ -12,6 +12,9 @@ import (
 // port is a bare number (e.g. "8080"); the colon prefix is added internally.
 // All routes pass through csrfMiddleware before reaching their handlers.
 func (a *App) Serve(ctx context.Context, port string) error {
+	if err := a.Setup(); err != nil {
+		return fmt.Errorf("setup: %w", err)
+	}
 	mux := http.NewServeMux()
 	a.registerRoutes(mux)
 
