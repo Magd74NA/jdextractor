@@ -52,7 +52,7 @@
 - [x] `jdextract generate` (stdin) — read piped text from stdin; error with usage hint if stdin is a TTY
 - [x] `jdextract list` — tabular output via `text/tabwriter`; skip corrupt `meta.json` with warning
 - [x] `jdextract status <prefix> <status>` — folder prefix match, validate against `draft|applied|interviewing|offer|rejected`
-- [ ] `jdextract serve --port <port>` — pass root context into `Serve()` for graceful shutdown (default 8080); subcommand slot reserved, exits with "not yet implemented"
+- [x] `jdextract serve --port <port>` — pass root context into `Serve()`
 
 ---
 

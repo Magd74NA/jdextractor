@@ -128,7 +128,7 @@ func ListJobs(a *App) ([]ApplicationMeta, error) {
 }
 
 // PrintJobs writes a tabular listing of jobs to stdout.
-func PrintJobs(jobs []ApplicationMeta) {
+func PrintJobs(jobs []ApplicationMeta) string {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "DATE\tCOMPANY\tROLE\tSCORE\tSTATUS\tDIR")
 	for _, j := range jobs {

@@ -20,9 +20,7 @@ By providing a target Job URL and a base resume text file, the tool uses an LLM 
 jdextract/
 ├── go.mod
 ├── cmd/
-│   ├── main.go              # CLI entry point; calls jdextract.App (//go:embed web in Phase 5)
-│   └── web/
-│       └── index.html       # Embedded UI (HTML/Alpine/Tailwind/DaisyUI)
+│   └── main.go              # CLI entry point; subcommand routing
 └── jdextract/               # Core package (importable library)
     ├── app.go               # Central App struct, PortablePaths, NewApp()
     ├── setup.go             # Setup() and createExampleTemplates()
@@ -33,10 +31,12 @@ jdextract/
     ├── generate.go          # LLM orchestration: JSON encode → prompt → GenerateAll
     ├── storage.go           # FS primitives + ApplicationMeta type + ListJobs, UpdateJobStatus
     ├── process.go           # Orchestration: (a *App) Process()
-    └── web.go               # (Phase 5, not yet created) net/http server; accepts fs.FS from caller
+    ├── server.go            # net/http server; Serve(ctx, port); //go:embed web/index.html
+    └── web/
+        └── index.html       # Embedded UI (HTML/Alpine/Tailwind/DaisyUI)
 ```
 
-In Phase 5, a `//go:embed web` directive in `cmd/main.go` will embed the UI. `fs.Sub(webFiles, "web")` will strip the prefix before passing to `App.Serve()`.
+The `//go:embed` directive must reside in the same package as the files it embeds, so `web/index.html` lives inside the `jdextract/` package directory alongside `server.go`. `cmd/main.go` calls `app.Serve(ctx, port)` directly — no embed or `fs.FS` passing needed.
 
 ## 4. Data Model (Filesystem as CRM)
 Every run creates a "Run Folder" under the data directory, forming a searchable application history.
@@ -248,13 +248,13 @@ Uses `ApplicationMeta` from `storage.go` (moved there in Phase 4).
 
 **Failure behavior:** If any write after folder creation fails, the partial folder remains on disk for inspection. The random component in the slug means re-running the same source produces a new, unique folder.
 
-### `Web Server` (web.go)
+### `Web Server` (server.go)
 
 ```go
-func (a *App) Serve(ctx context.Context, port string, ui fs.FS) error
+func (a *App) Serve(ctx context.Context, port string) error
 ```
 
-Accepts bare port number (e.g. `"8080"`), prepends `:` internally. Uses `http.Server.Shutdown(ctx)` for graceful shutdown — on context cancellation, in-flight requests (including long LLM calls) finish before the server exits.
+Accepts bare port number (e.g. `"8080"`), prepends `:` internally. Uses `http.Server.Shutdown(ctx)` for graceful shutdown — on context cancellation, in-flight requests (including long LLM calls) finish before the server exits. The UI is embedded directly via `//go:embed web/index.html` in `server.go`; no `fs.FS` parameter needed.
 
 **Endpoints:**
 *   `POST /api/process` — accepts `{"url": "..."}` or `{"local_text": "..."}`, wraps `Process()` with `context.WithTimeout` (300s). Returns output directory path and metadata.
