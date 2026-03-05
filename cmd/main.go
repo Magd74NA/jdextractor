@@ -12,7 +12,7 @@ import (
 func main() {
 
 	setup := flag.Bool("setup", false, "This flag is for running the setup for portable mode.")
-
+	local := flag.Bool("local", false, "This flag is for using ")
 	flag.Parse()
 	app, err, setupComplete := jdextract.NewApp(setup)
 	if setupComplete {
@@ -22,7 +22,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "setup error: %s\n", err)
 		os.Exit(1)
 	}
-	target := os.Args[1]
+	target := flag.Args()[0]
 	configPath := filepath.Join(app.Paths.Config, "config.json")
 	conf, err := os.Open(configPath)
 	if err != nil {
@@ -53,10 +53,21 @@ func main() {
 	}
 	app.Client = *client
 
-	raw, err := jdextract.FetchJobDescription(context.Background(), target, &app.Client, 0)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "fetch error: %s\n", err)
-		os.Exit(1)
+	var raw string
+
+	if !*local {
+		var err error
+		raw, err = jdextract.FetchJobDescription(context.Background(), target, &app.Client, 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "fetch error: %s\n", err)
+			os.Exit(1)
+		}
+	} else {
+		raw, err = jdextract.FetchJobDescriptionLocal(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading content from file: %s\n", err)
+			os.Exit(1)
+		}
 	}
 
 	dir, err := app.Process(context.Background(), raw)

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -42,6 +43,10 @@ func buildJinaUrl(target string) (*url.URL, error) {
 	return parsedTarget, nil
 }
 
+// FetchJobDescription fetches the markdown rendering of a job posting via the Jina.ai reader API.
+// t is the raw target URL of the job posting. backoff is the initial retry delay in milliseconds;
+// pass 0 on the first call. The function retries automatically on HTTP 429 with exponential backoff,
+// returning an error if the delay would exceed 10 seconds.
 func FetchJobDescription(ctx context.Context, t string, c *http.Client, backoff int) (string, error) {
 	if backoff != 0 {
 		select {
@@ -85,4 +90,12 @@ func FetchJobDescription(ctx context.Context, t string, c *http.Client, backoff 
 	}
 
 	return string(buff), nil
+}
+
+func FetchJobDescriptionLocal(t string) (string, error) {
+	content, err := os.ReadFile(t)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
 }
