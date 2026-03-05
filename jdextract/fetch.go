@@ -12,6 +12,9 @@ import (
 
 const JINA_URL = "https://r.jina.ai/"
 
+// InitiateClient returns a ready-to-use HTTP client after verifying connectivity
+// to the Jina.ai reader API. An error indicates the network or the remote service
+// is unavailable.
 func InitiateClient() (*http.Client, error) {
 	client := http.DefaultClient
 	err := testInitiateClient(client)
@@ -92,6 +95,8 @@ func FetchJobDescription(ctx context.Context, t string, c *http.Client, backoff 
 	return string(buff), nil
 }
 
+// FetchJobDescriptionLocal reads a job description from a local file at path t
+// and returns its contents as a string. It is the --local counterpart to FetchJobDescription.
 func FetchJobDescriptionLocal(t string) (string, error) {
 	content, err := os.ReadFile(t)
 	if err != nil {

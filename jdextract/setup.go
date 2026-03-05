@@ -86,6 +86,10 @@ Your Name
 	return nil
 }
 
+// Setup creates the portable directory structure (data/, config/, data/jobs/,
+// config/templates/) and writes example resume.txt and cover.txt templates if
+// they do not already exist. It is safe to call Setup on an existing installation;
+// it will not overwrite files the user has already customised.
 func (a *App) Setup() error {
 	for _, dir := range []string{a.Paths.Data, a.Paths.Config, a.Paths.Jobs, a.Paths.Templates} {
 		if err := os.MkdirAll(dir, 0755); err != nil {

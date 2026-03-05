@@ -6,12 +6,17 @@ import (
 	"os"
 )
 
+// Config holds runtime configuration loaded from config/config.json.
+// The file is created with 0600 permissions because it contains the API key.
 type Config struct {
 	DeepSeekApiKey string `json:"deepseek_api_key"`
 	DeepSeekModel  string `json:"deepseek_model"`
 	Port           int    `json:"port"`
 }
 
+// CreateEmptyConfig writes a skeleton config.json with placeholder values to path.
+// The file is created with 0600 permissions (owner read/write only) because it
+// will contain the DeepSeek API key. If the file already exists it is truncated.
 func CreateEmptyConfig(path string) error {
 	emptyConfig := `
 	{
@@ -36,6 +41,8 @@ func CreateEmptyConfig(path string) error {
 	return nil
 }
 
+// LoadConfig reads and JSON-decodes a Config from an open file.
+// The caller is responsible for opening the file; LoadConfig closes it.
 func LoadConfig(f *os.File) (*Config, error) {
 	defer f.Close()
 	data, err := io.ReadAll(f)

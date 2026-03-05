@@ -34,6 +34,14 @@ type deepseekResponse struct {
 	} `json:"usage"`
 }
 
+// InvokeDeepseekApi posts requestBody to the DeepSeek chat completions endpoint
+// and returns the raw JSON response body as a string. It contains no prompt logic —
+// callers are responsible for constructing the request payload.
+//
+// backoff is the current retry delay in milliseconds; pass 0 on the first call.
+// HTTP 429 responses trigger exponential backoff (500ms → 2.5s → 12.5s); the call
+// fails if the next delay would exceed 10 seconds. All other non-200 responses
+// return immediately without retrying.
 func InvokeDeepseekApi(ctx context.Context, apiKey string, c *http.Client, backoff int, requestBody json.RawMessage) (string, error) {
 	if backoff != 0 {
 		select {

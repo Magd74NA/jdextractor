@@ -51,6 +51,13 @@ func (a *App) ProcessBatch(ctx context.Context, urls []string) <-chan BatchResul
 	return ch
 }
 
+// Process runs the full generation pipeline for a single job description and
+// returns the path to the output directory. rawText may come from any source
+// (URL fetch, local file, or stdin) — routing is the caller's responsibility.
+//
+// Pipeline: Parse → load templates → GenerateAll (LLM) → create directory → write files.
+// The LLM call is the only expensive step; no filesystem writes happen before it
+// succeeds, so a failed generation leaves no partial state on disk.
 func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 	nodes := Parse(rawText)
 

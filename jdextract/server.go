@@ -11,7 +11,10 @@ import (
 //go:embed web/index.html
 var webFiles embed.FS
 
-// Serve starts the web UI on the given port and blocks until ctx is cancelled
+// Serve starts the web UI on the given port and blocks until ctx is cancelled,
+// at which point it performs a graceful shutdown via http.Server.Shutdown.
+// port is a bare number (e.g. "8080"); the colon prefix is added internally.
+// All routes pass through csrfMiddleware before reaching their handlers.
 func (a *App) Serve(ctx context.Context, port string) error {
 	mux := http.NewServeMux()
 

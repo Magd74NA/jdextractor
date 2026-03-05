@@ -46,6 +46,18 @@ func extractTag(re *regexp.Regexp, s string) string {
 	return strings.TrimSpace(m[1])
 }
 
+// GenerateAll sends the parsed job description and base templates to DeepSeek
+// and extracts the structured output from its response.
+//
+// nodes is the filtered AST from Parse; baseResume is required; baseCover is
+// optional — pass nil to skip cover letter generation.
+//
+// The LLM responds in plain text with XML delimiter tags (<company>, <role>,
+// <score>, <resume>, <cover>). GenerateAll extracts each field with compiled
+// regexps. It returns an error if any of company, role, or resume are empty,
+// which surfaces prompt compliance failures rather than silently writing empty
+// files. score defaults to 0 on parse failure (non-fatal). cover is nil when
+// baseCover is nil or the model omitted the tag.
 func GenerateAll(
 	ctx context.Context,
 	apiKey string,
