@@ -7,10 +7,15 @@ import (
 	"io"
 	"jdextract/jdextract"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
+	"time"
 )
+
+var version = "dev"
 
 const usage = `jdextract — tailor resumes to job descriptions
 
@@ -50,6 +55,8 @@ func main() {
 		cmdStatus(os.Args[2:])
 	case "serve":
 		cmdServe(os.Args[2:])
+	case "version", "--version", "-version":
+		fmt.Println(version)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n\n%s", os.Args[1], usage)
 		os.Exit(1)
@@ -239,6 +246,7 @@ func initAppForServe() *jdextract.App {
 func cmdServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fs.Int("port", 8080, "Port to listen on.")
+	open := fs.Bool("open", false, "Open browser after startup.")
 	fs.Parse(args)
 
 	app := initAppForServe()
@@ -255,9 +263,27 @@ func cmdServe(args []string) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	if *open {
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			openBrowser(fmt.Sprintf("http://localhost:%d", *port))
+		}()
+	}
+
 	if err := app.Serve(ctx, fmt.Sprintf("%d", *port)); err != nil {
 		fmt.Fprintf(os.Stderr, "serve error: %s\n", err)
 		os.Exit(1)
+	}
+}
+
+func openBrowser(url string) {
+	switch runtime.GOOS {
+	case "darwin":
+		exec.Command("open", url).Start()
+	case "windows":
+		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	default:
+		exec.Command("xdg-open", url).Start()
 	}
 }
 

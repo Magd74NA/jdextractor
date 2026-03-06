@@ -231,7 +231,7 @@
                                     <td x-text="job.company"></td>
                                     <td x-text="job.role"></td>
                                     <td>
-                                        <span class="badge badge-neutral" x-text="job.score + '/10'"></span>
+                                        <span :class="job.score >= 7 ? 'badge badge-success' : job.score >= 5 ? 'badge badge-warning' : 'badge badge-error'" x-text="job.score + '/10'"></span>
                                     </td>
                                     <td>
                                         <select class="select select-xs select-bordered"
