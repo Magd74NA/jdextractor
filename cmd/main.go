@@ -40,7 +40,14 @@ Subcommands:
 
 func main() {
 	if len(os.Args) < 2 {
-		cmdServe([]string{})
+		// Double-clicked or launched outside a terminal: open a terminal window
+		// first so the user can see server output, then auto-open the browser.
+		if !isTerminal() {
+			if relaunchInTerminal() {
+				return
+			}
+		}
+		cmdServe([]string{"--open"})
 		return
 	}
 
@@ -273,6 +280,52 @@ func cmdServe(args []string) {
 	if err := app.Serve(ctx, fmt.Sprintf("%d", *port)); err != nil {
 		fmt.Fprintf(os.Stderr, "serve error: %s\n", err)
 		os.Exit(1)
+	}
+}
+
+func isTerminal() bool {
+	fi, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
+
+func relaunchInTerminal() bool {
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		// Open a new Terminal.app window running this binary.
+		script := `tell app "Terminal" to do script "` + exe + `"`
+		return exec.Command("osascript", "-e", script).Start() == nil
+	case "windows":
+		// Windows .exe already opens a console window — nothing to do.
+		return false
+	default: // linux and other Unix
+		terminals := [][]string{
+			{"xterm", "-e"},
+			{"konsole", "-e"},
+			{"gnome-terminal", "--"},
+			{"xfce4-terminal", "-e"},
+			{"alacritty", "-e"},
+			{"kitty"},
+			{"foot"},
+		}
+		for _, t := range terminals {
+			path, err := exec.LookPath(t[0])
+			if err != nil {
+				continue
+			}
+			args := append(t[1:], exe)
+			cmd := exec.Command(path, args...)
+			if err := cmd.Start(); err == nil {
+				return true
+			}
+		}
+		return false
 	}
 }
 
