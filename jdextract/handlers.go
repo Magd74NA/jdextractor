@@ -138,7 +138,10 @@ func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-var validModels = []string{"deepseek-chat", "deepseek-reasoner"}
+var (
+	validDeepSeekModels = []string{"deepseek-chat", "deepseek-reasoner"}
+	validBackends       = []string{"deepseek", "kimi"}
+)
 
 // handleGetConfig returns the current in-memory Config as JSON.
 func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -152,14 +155,21 @@ func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		DeepSeekApiKey *string `json:"deepseek_api_key"`
 		DeepSeekModel  *string `json:"deepseek_model"`
+		KimiApiKey     *string `json:"kimi_api_key"`
+		KimiModel      *string `json:"kimi_model"`
+		Backend        *string `json:"backend"`
 		Port           *int    `json:"port"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid JSON body", http.StatusBadRequest)
 		return
 	}
-	if body.DeepSeekModel != nil && !slices.Contains(validModels, *body.DeepSeekModel) {
+	if body.DeepSeekModel != nil && !slices.Contains(validDeepSeekModels, *body.DeepSeekModel) {
 		http.Error(w, "invalid model: must be deepseek-chat or deepseek-reasoner", http.StatusBadRequest)
+		return
+	}
+	if body.Backend != nil && !slices.Contains(validBackends, *body.Backend) {
+		http.Error(w, "invalid backend: must be deepseek or kimi", http.StatusBadRequest)
 		return
 	}
 	if body.DeepSeekApiKey != nil {
@@ -167,6 +177,15 @@ func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.DeepSeekModel != nil {
 		a.Config.DeepSeekModel = *body.DeepSeekModel
+	}
+	if body.KimiApiKey != nil {
+		a.Config.KimiApiKey = *body.KimiApiKey
+	}
+	if body.KimiModel != nil {
+		a.Config.KimiModel = *body.KimiModel
+	}
+	if body.Backend != nil {
+		a.Config.Backend = *body.Backend
 	}
 	if body.Port != nil {
 		a.Config.Port = *body.Port

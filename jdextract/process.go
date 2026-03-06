@@ -71,10 +71,20 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 		baseCover = &c
 	}
 
+	invoker := LLMInvoker(InvokeDeepseekApi)
+	apiKey := a.Config.DeepSeekApiKey
+	model := a.Config.DeepSeekModel
+	if a.Config.Backend == "kimi" {
+		invoker = InvokeKimiApi
+		apiKey = a.Config.KimiApiKey
+		model = a.Config.KimiModel
+	}
+
 	company, role, resume, cover, score, tokens, err := GenerateAll(
 		ctx,
-		a.Config.DeepSeekApiKey,
-		a.Config.DeepSeekModel,
+		invoker,
+		apiKey,
+		model,
 		&a.Client,
 		nodes,
 		baseResume,

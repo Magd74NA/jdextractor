@@ -30,6 +30,10 @@ full tailored resume text
 tailored cover letter (include ONLY if a base cover letter was provided)
 </cover>`
 
+// LLMInvoker is a function that posts a JSON request body to an LLM endpoint
+// and returns the raw response body. Use InvokeDeepseekApi or InvokeKimiApi.
+type LLMInvoker func(ctx context.Context, apiKey string, c *http.Client, backoff int, body json.RawMessage) (string, error)
+
 var (
 	companyTagRe = regexp.MustCompile(`(?s)<company>(.*?)</company>`)
 	roleTagRe    = regexp.MustCompile(`(?s)<role>(.*?)</role>`)
@@ -60,6 +64,7 @@ func extractTag(re *regexp.Regexp, s string) string {
 // baseCover is nil or the model omitted the tag.
 func GenerateAll(
 	ctx context.Context,
+	invoker LLMInvoker,
 	apiKey string,
 	model string,
 	c *http.Client,
@@ -96,7 +101,7 @@ func GenerateAll(
 		return "", "", "", nil, 0, 0, fmt.Errorf("marshal request: %w", err)
 	}
 
-	raw, err := InvokeDeepseekApi(ctx, apiKey, c, 0, json.RawMessage(bodyBytes))
+	raw, err := invoker(ctx, apiKey, c, 0, json.RawMessage(bodyBytes))
 	if err != nil {
 		return "", "", "", nil, 0, 0, err
 	}

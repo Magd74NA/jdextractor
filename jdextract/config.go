@@ -11,6 +11,9 @@ import (
 type Config struct {
 	DeepSeekApiKey string `json:"deepseek_api_key"`
 	DeepSeekModel  string `json:"deepseek_model"`
+	KimiApiKey     string `json:"kimi_api_key"`
+	KimiModel      string `json:"kimi_model"`
+	Backend        string `json:"backend"` // "deepseek" (default) or "kimi"
 	Port           int    `json:"port"`
 }
 
@@ -22,6 +25,9 @@ func CreateEmptyConfig(path string) error {
 	{
 		"deepseek_api_key": "example_key",
 		"deepseek_model": "deepseek-chat",
+		"kimi_api_key": "",
+		"kimi_model": "moonshotai/Kimi-K2.5",
+		"backend": "deepseek",
 		"port": 8080
 	}
 	`

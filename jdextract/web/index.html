@@ -25,28 +25,61 @@
                 </button>
                 <div x-show="configOpen" class="mt-3 space-y-4">
 
-                    <!-- Model -->
+                    <!-- Backend -->
                     <div class="form-control space-y-1">
-                        <label class="label pb-0"><span class="label-text font-medium">Model</span></label>
-                        <select class="select select-bordered w-full" x-model="config.deepseek_model">
-                            <option value="deepseek-chat">deepseek-chat — fast &amp; cheap (recommended for 90% of use cases)</option>
-                            <option value="deepseek-reasoner">deepseek-reasoner — smarter but slower and costs more</option>
+                        <label class="label pb-0"><span class="label-text font-medium">Backend</span></label>
+                        <select class="select select-bordered w-full" x-model="config.backend">
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="kimi">Kimi K2.5 — experimental, highly capable writing model</option>
                         </select>
                     </div>
 
-                    <!-- API Key -->
-                    <div class="form-control space-y-1">
-                        <label class="label pb-0"><span class="label-text font-medium">DeepSeek API Key</span></label>
-                        <div class="flex gap-2">
-                            <input class="input input-bordered flex-1 font-mono text-sm"
-                                   :type="showApiKey ? 'text' : 'password'"
-                                   placeholder="sk-..."
-                                   x-model="config.deepseek_api_key">
-                            <button class="btn btn-ghost btn-sm self-center"
-                                    @click="showApiKey = !showApiKey"
-                                    x-text="showApiKey ? 'Hide' : 'Show'"></button>
+                    <!-- DeepSeek fields -->
+                    <template x-if="config.backend !== 'kimi'">
+                        <div class="space-y-4">
+                            <div class="form-control space-y-1">
+                                <label class="label pb-0"><span class="label-text font-medium">Model</span></label>
+                                <select class="select select-bordered w-full" x-model="config.deepseek_model">
+                                    <option value="deepseek-chat">deepseek-chat — fast &amp; cheap (recommended for 90% of use cases)</option>
+                                    <option value="deepseek-reasoner">deepseek-reasoner — smarter but slower and costs more</option>
+                                </select>
+                            </div>
+                            <div class="form-control space-y-1">
+                                <label class="label pb-0"><span class="label-text font-medium">DeepSeek API Key</span></label>
+                                <div class="flex gap-2">
+                                    <input class="input input-bordered flex-1 font-mono text-sm"
+                                           :type="showApiKey ? 'text' : 'password'"
+                                           placeholder="sk-..."
+                                           x-model="config.deepseek_api_key">
+                                    <button class="btn btn-ghost btn-sm self-center"
+                                            @click="showApiKey = !showApiKey"
+                                            x-text="showApiKey ? 'Hide' : 'Show'"></button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </template>
+
+                    <!-- Kimi fields -->
+                    <template x-if="config.backend === 'kimi'">
+                        <div class="space-y-4">
+                            <div role="alert" class="alert alert-warning py-2 text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                                <span>Experimental — Kimi K2.5 is a highly capable writing model via Baseten. Latency and cost may differ from DeepSeek.</span>
+                            </div>
+                            <div class="form-control space-y-1">
+                                <label class="label pb-0"><span class="label-text font-medium">Kimi API Key (Baseten)</span></label>
+                                <div class="flex gap-2">
+                                    <input class="input input-bordered flex-1 font-mono text-sm"
+                                           :type="showApiKey ? 'text' : 'password'"
+                                           placeholder="Co1I3p..."
+                                           x-model="config.kimi_api_key">
+                                    <button class="btn btn-ghost btn-sm self-center"
+                                            @click="showApiKey = !showApiKey"
+                                            x-text="showApiKey ? 'Hide' : 'Show'"></button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
 
                     <!-- Port -->
                     <div class="form-control space-y-1">
@@ -295,7 +328,7 @@
         return {
             // config card
             configOpen: false,
-            config: { deepseek_api_key: '', deepseek_model: 'deepseek-chat', port: 8080 },
+            config: { deepseek_api_key: '', deepseek_model: 'deepseek-chat', kimi_api_key: '', kimi_model: 'moonshotai/Kimi-K2.5', backend: 'deepseek', port: 8080 },
             configSaving: false,
             configSaved: false,
             configError: null,
@@ -348,6 +381,9 @@
                     this.config = {
                         deepseek_api_key: data.deepseek_api_key || '',
                         deepseek_model: data.deepseek_model || 'deepseek-chat',
+                        kimi_api_key: data.kimi_api_key || '',
+                        kimi_model: data.kimi_model || 'moonshotai/Kimi-K2.5',
+                        backend: data.backend || 'deepseek',
                         port: data.port || 8080,
                     };
                 } catch (e) {
