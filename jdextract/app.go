@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 )
 
 // PortablePaths holds all directory paths resolved relative to the executable.
@@ -42,23 +40,6 @@ func getPortablePaths() (PortablePaths, error) {
 	}
 
 	root := filepath.Dir(execPath)
-
-	if runtime.GOOS == "darwin" {
-		// Walk up until we find the .app bundle root
-		for {
-			if strings.HasSuffix(root, ".app") {
-				// Found it, now go one more level up to get the container
-				root = filepath.Dir(root)
-				break
-			}
-			parent := filepath.Dir(root)
-			if parent == root {
-				// Hit filesystem root without finding .app
-				break
-			}
-			root = parent
-		}
-	}
 
 	paths := PortablePaths{
 		Root:      root,
