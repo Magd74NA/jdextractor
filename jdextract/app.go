@@ -22,9 +22,10 @@ type PortablePaths struct {
 // across all operations. The CLI creates one App per invocation; the web server
 // holds a single App for its lifetime.
 type App struct {
-	Paths  PortablePaths
-	Config Config
-	Client http.Client
+	Paths        PortablePaths
+	Config       Config
+	PromptConfig PromptConfig
+	Client       http.Client
 }
 
 func getPortablePaths() (PortablePaths, error) {

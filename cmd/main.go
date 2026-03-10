@@ -84,9 +84,11 @@ func initApp() *jdextract.App {
 func initAppWithConfig() *jdextract.App {
 	app := initApp()
 	configPath := filepath.Join(app.Paths.Config, "config.json")
+	promptConfigPath := filepath.Join(app.Paths.Config, "prompt.json")
 	conf, err := os.Open(configPath)
 	if err != nil {
 		err = jdextract.CreateEmptyConfig(configPath)
+		err = jdextract.CreateEmptyPromptConfig(promptConfigPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating config: %s\n", err)
 			os.Exit(1)
@@ -101,6 +103,15 @@ func initAppWithConfig() *jdextract.App {
 		os.Exit(1)
 	}
 	app.Config = *config
+
+	if pconf, err := os.Open(promptConfigPath); err == nil {
+		promptConfig, err := jdextract.LoadPromptConfig(pconf)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "prompt config load error: %s\n", err)
+			os.Exit(1)
+		}
+		app.PromptConfig = *promptConfig
+	}
 
 	if app.Config.DeepSeekApiKey == "" || app.Config.DeepSeekApiKey == "example_key" {
 		fmt.Fprintf(os.Stderr, "error: set deepseek_api_key in %s\n", configPath)
@@ -236,6 +247,7 @@ func cmdStatus(args []string) {
 func initAppForServe() *jdextract.App {
 	app := initApp()
 	configPath := filepath.Join(app.Paths.Config, "config.json")
+	promptConfigPath := filepath.Join(app.Paths.Config, "prompt.json")
 	if conf, err := os.Open(configPath); err == nil {
 		config, err := jdextract.LoadConfig(conf)
 		if err != nil {
@@ -243,6 +255,14 @@ func initAppForServe() *jdextract.App {
 			os.Exit(1)
 		}
 		app.Config = *config
+	}
+	if pconf, err := os.Open(promptConfigPath); err == nil {
+		promptConfig, err := jdextract.LoadPromptConfig(pconf)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "prompt config load error: %s\n", err)
+			os.Exit(1)
+		}
+		app.PromptConfig = *promptConfig
 	}
 	if client, err := jdextract.InitiateClient(); err == nil {
 		app.Client = *client

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 )
 
@@ -15,6 +17,21 @@ func (a *App) Serve(ctx context.Context, port string) error {
 	if err := a.Setup(); err != nil {
 		return fmt.Errorf("setup: %w", err)
 	}
+
+	// Ensure prompt.json exists and PromptConfig is populated.
+	// Setup() guarantees the config dir exists by this point.
+	promptConfigPath := filepath.Join(a.Paths.Config, "prompt.json")
+	if a.PromptConfig.SystemPrompt == "" && a.PromptConfig.TaskList == "" {
+		if _, err := os.Stat(promptConfigPath); os.IsNotExist(err) {
+			_ = CreateEmptyPromptConfig(promptConfigPath)
+		}
+		if f, err := os.Open(promptConfigPath); err == nil {
+			if cfg, err := LoadPromptConfig(f); err == nil {
+				a.PromptConfig = *cfg
+			}
+		}
+	}
+
 	mux := http.NewServeMux()
 	a.registerRoutes(mux)
 

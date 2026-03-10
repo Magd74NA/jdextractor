@@ -10,16 +10,7 @@ import (
 	"strings"
 )
 
-const systemPrompt = `You are a professional resume writer and career coach.
-You will receive a job description as a JSON array of classified lines, a base resume, and optionally a base cover letter.
-
-Your tasks:
-1. Extract the company name and role title from the job description.
-2. Rewrite the resume to align with the job — keep experience truthful, sharpen bullets to mirror the job's language and priorities.
-3. If a base cover letter is provided, draft a tailored cover letter for this role.
-4. Rate how well the base resume matches the job requirements on a scale of 1–10 (1 = poor fit, 10 = perfect fit).
-
-Respond using exactly these XML tags, in this order:
+const responseFormat = `Respond using exactly these XML tags, in this order:
 <company>company name</company>
 <role>role title</role>
 <score>integer 1-10</score>
@@ -71,11 +62,15 @@ func GenerateAll(
 	nodes []JobDescriptionNode,
 	baseResume string,
 	baseCover *string,
+	promptConfig PromptConfig,
 ) (company, role, resume string, cover *string, score, tokensUsed int, err error) {
 	jobJSON, err := json.Marshal(nodes)
 	if err != nil {
 		return "", "", "", nil, 0, 0, fmt.Errorf("json encode: %w", err)
 	}
+
+	// Build system prompt from config
+	systemPrompt := promptConfig.SystemPrompt + "\n\n" + promptConfig.TaskList + "\n\n" + responseFormat
 
 	var sb strings.Builder
 	sb.WriteString("JOB DESCRIPTION:\n")

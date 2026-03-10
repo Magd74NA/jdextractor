@@ -19,6 +19,8 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", a.handleIndex)
 	mux.HandleFunc("GET /api/config", a.handleGetConfig)
 	mux.HandleFunc("PATCH /api/config", a.handleUpdateConfig)
+	mux.HandleFunc("GET /api/config/prompt", a.handleGetPromptConfig)
+	mux.HandleFunc("PATCH /api/config/prompt", a.handleUpdatePromptConfig)
 	mux.HandleFunc("GET /api/templates", a.handleGetTemplates)
 	mux.HandleFunc("PATCH /api/templates", a.handleSaveTemplates)
 	mux.HandleFunc("GET /api/jobs/{id}/files", a.handleGetJobFiles)
@@ -149,6 +151,12 @@ func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(a.Config)
 }
 
+// handleGetConfig returns the current in-memory Prompt Config as JSON.
+func (a *App) handleGetPromptConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(a.PromptConfig)
+}
+
 // handleUpdateConfig applies a partial config update, persists it to disk, and
 // updates the in-memory Config. Only non-nil fields in the body are applied.
 func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +201,31 @@ func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(a.Paths.Config, "config.json")
 	if err := SaveConfig(path, a.Config); err != nil {
 		http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleUpdatePromptConfig applies a prompt config update, persists it to disk, and
+// updates the in-memory PromptConfig.
+func (a *App) handleUpdatePromptConfig(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		TaskList     *string `json:"task_list"`
+		SystemPrompt *string `json:"system_prompt"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if body.TaskList != nil {
+		a.PromptConfig.TaskList = *body.TaskList
+	}
+	if body.SystemPrompt != nil {
+		a.PromptConfig.SystemPrompt = *body.SystemPrompt
+	}
+	path := filepath.Join(a.Paths.Config, "prompt.json")
+	if err := SavePromptConfig(path, a.PromptConfig); err != nil {
+		http.Error(w, "failed to save prompt config: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

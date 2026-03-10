@@ -89,6 +89,7 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 		nodes,
 		baseResume,
 		baseCover,
+		a.PromptConfig,
 	)
 	if err != nil {
 		return "", fmt.Errorf("generate: %w", err)

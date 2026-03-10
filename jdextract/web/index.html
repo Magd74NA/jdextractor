@@ -89,6 +89,19 @@
                         <p class="text-xs text-base-content/50">Port changes require a server restart.</p>
                     </div>
 
+                    <!-- System Prompt -->
+                    <div class="form-control space-y-1">
+                        <label class="label pb-0"><span class="label-text font-medium">System Prompt</span></label>
+                        <textarea class="textarea textarea-bordered w-full h-64 font-mono text-xs"
+                                  x-model="promptConfig.system_prompt"></textarea>
+                    </div>
+
+                    <!-- Task List -->
+                    <div class="form-control space-y-1">
+                        <label class="label pb-0"><span class="label-text font-medium">Task List</span></label>
+                        <textarea class="textarea textarea-bordered w-full h-48 font-mono text-xs"
+                                  x-model="promptConfig.task_list"></textarea>
+                    </div>
                     <!-- Save -->
                     <div class="flex items-center gap-3">
                         <button class="btn btn-primary btn-sm" @click="saveConfig()"
@@ -329,6 +342,7 @@
             // config card
             configOpen: false,
             config: { deepseek_api_key: '', deepseek_model: 'deepseek-chat', kimi_api_key: '', kimi_model: 'moonshotai/Kimi-K2.5', backend: 'deepseek', port: 8080 },
+            promptConfig: {task_list:'', system_prompt:''},
             configSaving: false,
             configSaved: false,
             configError: null,
@@ -370,6 +384,7 @@
 
             async init() {
                 await this.loadConfig();
+                await this.loadPromptConfig();
                 await this.loadJobs();
             },
 
@@ -391,17 +406,41 @@
                 }
             },
 
+            async loadPromptConfig() {
+                try {
+                    const res = await fetch('/api/config/prompt');
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const data = await res.json();
+                    this.promptConfig = {
+                        system_prompt: data.system_prompt || '',
+                        task_list: data.task_list || '',
+                    };
+                } catch (e) {
+                    // non-fatal — defaults remain
+                }
+            },
+
             async saveConfig() {
                 this.configSaved = false;
                 this.configError = null;
                 this.configSaving = true;
                 try {
+                    // Save main config
                     const res = await fetch('/api/config', {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.config),
                     });
                     if (!res.ok) throw new Error(await res.text());
+
+                    // Save prompt config
+                    const promptRes = await fetch('/api/config/prompt', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.promptConfig),
+                    });
+                    if (!promptRes.ok) throw new Error(await promptRes.text());
+
                     this.configSaved = true;
                     setTimeout(() => { this.configSaved = false; }, 3000);
                 } catch (e) {

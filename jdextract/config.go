@@ -17,6 +17,19 @@ type Config struct {
 	Port           int    `json:"port"`
 }
 
+type PromptConfig struct {
+	TaskList     string `json:"task_list"`
+	SystemPrompt string `json:"system_prompt"`
+}
+
+func CreateEmptyPromptConfig(path string) error {
+	cfg := PromptConfig{
+		SystemPrompt: "You are a professional resume writer and career coach.\nYou will receive a job description as a JSON array of classified lines, a base resume, and optionally a base cover letter.\n",
+		TaskList:     "1. Extract the company name and role title from the job description.\n2. Rewrite the resume to align with the job — keep experience truthful, sharpen bullets to mirror the job's language and priorities.\n3. If a base cover letter is provided, draft a tailored cover letter for this role.\n4. Rate how well the base resume matches the job requirements on a scale of 1–10 (1 = poor fit, 10 = perfect fit).",
+	}
+	return SavePromptConfig(path, cfg)
+}
+
 // CreateEmptyConfig writes a skeleton config.json with placeholder values to path.
 // The file is created with 0600 permissions (owner read/write only) because it
 // will contain the DeepSeek API key. If the file already exists it is truncated.
@@ -54,6 +67,30 @@ func SaveConfig(path string, cfg Config) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0600)
+}
+
+// SavePromptConfig writes prompt cfg to path as indented JSON with 0600 permissions.
+func SavePromptConfig(path string, cfg PromptConfig) error {
+	data, err := json.MarshalIndent(cfg, "", "\t")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
+}
+
+// LoadPromptConfig reads and JSON-decodes a PromptConfig from an open file.
+// The caller is responsible for opening the file; LoadPromptConfig closes it.
+func LoadPromptConfig(f *os.File) (*PromptConfig, error) {
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	var cfg PromptConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }
 
 // LoadConfig reads and JSON-decodes a Config from an open file.
