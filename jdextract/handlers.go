@@ -33,6 +33,32 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/process/local", a.handleProcessLocal)
 }
 
+// writeJSON sets Content-Type and encodes v as JSON.
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}
+
+// decodeBody decodes JSON from r.Body into v. Returns false and writes a 400
+// on failure so callers can early-return immediately.
+func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+// validID rejects job IDs that could escape the jobs directory.
+func validID(id string) bool {
+	return id != "" && id != "." && !strings.Contains(id, "/") && !strings.Contains(id, "\\")
+}
+
+var (
+	validDeepSeekModels = []string{"deepseek-chat", "deepseek-reasoner"}
+	validBackends       = []string{"deepseek", "kimi"}
+)
+
 // handleGetTemplates returns the current resume and cover letter templates.
 func (a *App) handleGetTemplates(w http.ResponseWriter, r *http.Request) {
 	out := struct {
@@ -45,8 +71,7 @@ func (a *App) handleGetTemplates(w http.ResponseWriter, r *http.Request) {
 	if b, err := os.ReadFile(filepath.Join(a.Paths.Templates, "cover.txt")); err == nil {
 		out.Cover = string(b)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	writeJSON(w, out)
 }
 
 // handleSaveTemplates writes resume.txt and/or cover.txt to the templates directory.
@@ -56,8 +81,7 @@ func (a *App) handleSaveTemplates(w http.ResponseWriter, r *http.Request) {
 		Resume *string `json:"resume"`
 		Cover  *string `json:"cover"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	if body.Resume != nil {
@@ -79,7 +103,7 @@ func (a *App) handleSaveTemplates(w http.ResponseWriter, r *http.Request) {
 // for a job identified by its exact directory name.
 func (a *App) handleGetJobFiles(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if id == "" || id == "." || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+	if !validID(id) {
 		http.Error(w, "invalid job id", http.StatusBadRequest)
 		return
 	}
@@ -103,16 +127,14 @@ func (a *App) handleGetJobFiles(w http.ResponseWriter, r *http.Request) {
 	if coverBytes, err := os.ReadFile(filepath.Join(dir, "cover.txt")); err == nil {
 		out.Cover = string(coverBytes)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	writeJSON(w, out)
 }
 
 // handleSaveJobFiles writes resume.txt and/or cover.txt for a job.
-// Only non-empty fields in the body are written; omitted fields are left untouched.
+// Only non-nil fields in the body are written; omitted fields are left untouched.
 func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if id == "" || id == "." || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+	if !validID(id) {
 		http.Error(w, "invalid job id", http.StatusBadRequest)
 		return
 	}
@@ -120,8 +142,7 @@ func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
 		Resume *string `json:"resume"`
 		Cover  *string `json:"cover"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	dir := filepath.Join(a.Paths.Jobs, id)
@@ -140,21 +161,14 @@ func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-var (
-	validDeepSeekModels = []string{"deepseek-chat", "deepseek-reasoner"}
-	validBackends       = []string{"deepseek", "kimi"}
-)
-
 // handleGetConfig returns the current in-memory Config as JSON.
 func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(a.Config)
+	writeJSON(w, a.Config)
 }
 
-// handleGetConfig returns the current in-memory Prompt Config as JSON.
+// handleGetPromptConfig returns the current in-memory PromptConfig as JSON.
 func (a *App) handleGetPromptConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(a.PromptConfig)
+	writeJSON(w, a.PromptConfig)
 }
 
 // handleUpdateConfig applies a partial config update, persists it to disk, and
@@ -168,8 +182,7 @@ func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Backend        *string `json:"backend"`
 		Port           *int    `json:"port"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	if body.DeepSeekModel != nil && !slices.Contains(validDeepSeekModels, *body.DeepSeekModel) {
@@ -213,8 +226,7 @@ func (a *App) handleUpdatePromptConfig(w http.ResponseWriter, r *http.Request) {
 		TaskList     *string `json:"task_list"`
 		SystemPrompt *string `json:"system_prompt"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	if body.TaskList != nil {
@@ -250,8 +262,7 @@ func (a *App) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	for i, j := range jobs {
 		out[i] = jobResponse{ApplicationMeta: j, Dir: j.Dir}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	writeJSON(w, out)
 }
 
 // handleUpdateJobStatus decodes {"status":"..."} and updates the job's meta.json.
@@ -260,8 +271,7 @@ func (a *App) handleUpdateJobStatus(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Status string `json:"status"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	if err := UpdateJobStatus(a, id, body.Status); err != nil {
@@ -287,8 +297,8 @@ func (a *App) handleProcess(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		URL string `json:"url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.URL == "" {
-		http.Error(w, "invalid JSON body: url required", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) || body.URL == "" {
+		http.Error(w, "url required", http.StatusBadRequest)
 		return
 	}
 	raw, err := FetchJobDescription(r.Context(), body.URL, &a.Client, 0)
@@ -301,8 +311,7 @@ func (a *App) handleProcess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "process error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(struct {
+	writeJSON(w, struct {
 		Dir string `json:"dir"`
 	}{Dir: dir})
 }
@@ -320,8 +329,8 @@ func (a *App) handleProcessBatch(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		URLs []string `json:"urls"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.URLs) == 0 {
-		http.Error(w, "invalid JSON body: urls required", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) || len(body.URLs) == 0 {
+		http.Error(w, "urls required", http.StatusBadRequest)
 		return
 	}
 	var results []batchItemResult
@@ -332,8 +341,7 @@ func (a *App) handleProcessBatch(w http.ResponseWriter, r *http.Request) {
 		}
 		results = append(results, res)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	writeJSON(w, results)
 }
 
 // handleProcessLocal accepts {"content":"..."} (raw job description text) and
@@ -342,8 +350,8 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Content string `json:"content"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" {
-		http.Error(w, "invalid JSON body: content required", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) || body.Content == "" {
+		http.Error(w, "content required", http.StatusBadRequest)
 		return
 	}
 	dir, err := a.Process(r.Context(), body.Content)
@@ -351,8 +359,7 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "process error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(struct {
+	writeJSON(w, struct {
 		Dir string `json:"dir"`
 	}{Dir: dir})
 }
