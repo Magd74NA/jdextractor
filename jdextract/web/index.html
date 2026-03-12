@@ -34,52 +34,41 @@
                         </select>
                     </div>
 
-                    <!-- DeepSeek fields -->
+                    <!-- DeepSeek model -->
                     <template x-if="config.backend !== 'kimi'">
-                        <div class="space-y-4">
-                            <div class="form-control space-y-1">
-                                <label class="label pb-0"><span class="label-text font-medium">Model</span></label>
-                                <select class="select select-bordered w-full" x-model="config.deepseek_model">
-                                    <option value="deepseek-chat">deepseek-chat — fast &amp; cheap (recommended for 90% of use cases)</option>
-                                    <option value="deepseek-reasoner">deepseek-reasoner — smarter but slower and costs more</option>
-                                </select>
-                            </div>
-                            <div class="form-control space-y-1">
-                                <label class="label pb-0"><span class="label-text font-medium">DeepSeek API Key</span></label>
-                                <div class="flex gap-2">
-                                    <input class="input input-bordered flex-1 font-mono text-sm"
-                                           :type="showApiKey ? 'text' : 'password'"
-                                           placeholder="sk-..."
-                                           x-model="config.deepseek_api_key">
-                                    <button class="btn btn-ghost btn-sm self-center"
-                                            @click="showApiKey = !showApiKey"
-                                            x-text="showApiKey ? 'Hide' : 'Show'"></button>
-                                </div>
-                            </div>
+                        <div class="form-control space-y-1">
+                            <label class="label pb-0"><span class="label-text font-medium">Model</span></label>
+                            <select class="select select-bordered w-full" x-model="config.deepseek_model">
+                                <option value="deepseek-chat">deepseek-chat — fast &amp; cheap (recommended for 90% of use cases)</option>
+                                <option value="deepseek-reasoner">deepseek-reasoner — smarter but slower and costs more</option>
+                            </select>
                         </div>
                     </template>
 
-                    <!-- Kimi fields -->
+                    <!-- Kimi warning -->
                     <template x-if="config.backend === 'kimi'">
-                        <div class="space-y-4">
-                            <div role="alert" class="alert alert-warning py-2 text-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                                <span>Experimental — Kimi K2.5 is a highly capable writing model via Baseten. Latency and cost may differ from DeepSeek.</span>
-                            </div>
-                            <div class="form-control space-y-1">
-                                <label class="label pb-0"><span class="label-text font-medium">Kimi API Key (Baseten)</span></label>
-                                <div class="flex gap-2">
-                                    <input class="input input-bordered flex-1 font-mono text-sm"
-                                           :type="showApiKey ? 'text' : 'password'"
-                                           placeholder="Co1I3p..."
-                                           x-model="config.kimi_api_key">
-                                    <button class="btn btn-ghost btn-sm self-center"
-                                            @click="showApiKey = !showApiKey"
-                                            x-text="showApiKey ? 'Hide' : 'Show'"></button>
-                                </div>
-                            </div>
+                        <div role="alert" class="alert alert-warning py-2 text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                            <span>Experimental — Kimi K2.5 is a highly capable writing model via Baseten. Latency and cost may differ from DeepSeek.</span>
                         </div>
                     </template>
+
+                    <!-- API Key (shared, adapts to backend) -->
+                    <div class="form-control space-y-1">
+                        <label class="label pb-0">
+                            <span class="label-text font-medium" x-text="config.backend === 'kimi' ? 'Kimi API Key (Baseten)' : 'DeepSeek API Key'"></span>
+                        </label>
+                        <div class="flex gap-2">
+                            <input class="input input-bordered flex-1 font-mono text-sm"
+                                   :type="showApiKey ? 'text' : 'password'"
+                                   :placeholder="config.backend === 'kimi' ? 'Co1I3p...' : 'sk-...'"
+                                   :value="config.backend === 'kimi' ? config.kimi_api_key : config.deepseek_api_key"
+                                   @input="config.backend === 'kimi' ? (config.kimi_api_key = $event.target.value) : (config.deepseek_api_key = $event.target.value)">
+                            <button class="btn btn-ghost btn-sm self-center"
+                                    @click="showApiKey = !showApiKey"
+                                    x-text="showApiKey ? 'Hide' : 'Show'"></button>
+                        </div>
+                    </div>
 
                     <!-- Port -->
                     <div class="form-control space-y-1">
@@ -102,6 +91,7 @@
                         <textarea class="textarea textarea-bordered w-full h-48 font-mono text-xs"
                                   x-model="promptConfig.task_list"></textarea>
                     </div>
+
                     <!-- Save -->
                     <div class="flex items-center gap-3">
                         <button class="btn btn-primary btn-sm" @click="saveConfig()"
@@ -342,7 +332,7 @@
             // config card
             configOpen: false,
             config: { deepseek_api_key: '', deepseek_model: 'deepseek-chat', kimi_api_key: '', kimi_model: 'moonshotai/Kimi-K2.5', backend: 'deepseek', port: 8080 },
-            promptConfig: {task_list:'', system_prompt:''},
+            promptConfig: { task_list: '', system_prompt: '' },
             configSaving: false,
             configSaved: false,
             configError: null,
@@ -388,6 +378,15 @@
                 await this.loadJobs();
             },
 
+            flash(prop) {
+                this[prop] = true;
+                setTimeout(() => { this[prop] = false; }, 3000);
+            },
+
+            _patch(url, body) {
+                return fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            },
+
             async loadConfig() {
                 try {
                     const res = await fetch('/api/config');
@@ -425,24 +424,11 @@
                 this.configError = null;
                 this.configSaving = true;
                 try {
-                    // Save main config
-                    const res = await fetch('/api/config', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(this.config),
-                    });
-                    if (!res.ok) throw new Error(await res.text());
-
-                    // Save prompt config
-                    const promptRes = await fetch('/api/config/prompt', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(this.promptConfig),
-                    });
-                    if (!promptRes.ok) throw new Error(await promptRes.text());
-
-                    this.configSaved = true;
-                    setTimeout(() => { this.configSaved = false; }, 3000);
+                    const r1 = await this._patch('/api/config', this.config);
+                    if (!r1.ok) throw new Error(await r1.text());
+                    const r2 = await this._patch('/api/config/prompt', this.promptConfig);
+                    if (!r2.ok) throw new Error(await r2.text());
+                    this.flash('configSaved');
                 } catch (e) {
                     this.configError = e.message;
                 } finally {
@@ -467,34 +453,16 @@
 
             async saveTemplate(type) {
                 const body = type === 'resume' ? { resume: this.tmpl.resume } : { cover: this.tmpl.cover };
-                await fetch('/api/templates', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body),
-                });
-                if (type === 'resume') {
-                    this.tmplResumeSaved = true;
-                    setTimeout(() => { this.tmplResumeSaved = false; }, 3000);
-                } else {
-                    this.tmplCoverSaved = true;
-                    setTimeout(() => { this.tmplCoverSaved = false; }, 3000);
-                }
+                await this._patch('/api/templates', body);
+                this.flash(type === 'resume' ? 'tmplResumeSaved' : 'tmplCoverSaved');
             },
 
             async saveFile(job, type) {
                 const body = type === 'resume' ? { resume: job.resume } : { cover: job.cover };
-                await fetch('/api/jobs/' + job.dir + '/files', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body),
-                });
-                if (type === 'resume') {
-                    job.resumeSaved = true;
-                    setTimeout(() => { job.resumeSaved = false; }, 3000);
-                } else {
-                    job.coverSaved = true;
-                    setTimeout(() => { job.coverSaved = false; }, 3000);
-                }
+                await this._patch('/api/jobs/' + job.dir + '/files', body);
+                const prop = type === 'resume' ? 'resumeSaved' : 'coverSaved';
+                job[prop] = true;
+                setTimeout(() => { job[prop] = false; }, 3000);
             },
 
             async openFiles(job) {
@@ -532,11 +500,7 @@
             },
 
             async updateStatus(job, status) {
-                const res = await fetch('/api/jobs/' + job.dir, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status }),
-                });
+                const res = await this._patch('/api/jobs/' + job.dir, { status });
                 if (res.ok) job.status = status;
             },
 
@@ -545,26 +509,32 @@
                 if (res.ok) this.jobs = this.jobs.filter(j => j.dir !== job.dir);
             },
 
-            async submitSingle() {
-                this.singleResult = null;
-                this.singleError = null;
-                this.singleLoading = true;
+            async _process(endpoint, body, prefix) {
+                this[prefix + 'Result'] = null;
+                this[prefix + 'Error'] = null;
+                this[prefix + 'Loading'] = true;
                 try {
-                    const res = await fetch('/api/process', {
+                    const res = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: this.singleURL.trim() }),
+                        body: JSON.stringify(body),
                     });
                     if (!res.ok) throw new Error(await res.text());
                     const data = await res.json();
-                    this.singleResult = data.dir;
-                    this.singleURL = '';
+                    this[prefix + 'Result'] = data.dir;
                     await this.loadJobs();
+                    return true;
                 } catch (e) {
-                    this.singleError = e.message;
+                    this[prefix + 'Error'] = e.message;
+                    return false;
                 } finally {
-                    this.singleLoading = false;
+                    this[prefix + 'Loading'] = false;
                 }
+            },
+
+            async submitSingle() {
+                if (await this._process('/api/process', { url: this.singleURL.trim() }, 'single'))
+                    this.singleURL = '';
             },
 
             async submitBatch() {
@@ -589,25 +559,8 @@
             },
 
             async submitLocal() {
-                this.localResult = null;
-                this.localError = null;
-                this.localLoading = true;
-                try {
-                    const res = await fetch('/api/process/local', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: this.localContent }),
-                    });
-                    if (!res.ok) throw new Error(await res.text());
-                    const data = await res.json();
-                    this.localResult = data.dir;
+                if (await this._process('/api/process/local', { content: this.localContent }, 'local'))
                     this.localContent = '';
-                    await this.loadJobs();
-                } catch (e) {
-                    this.localError = e.message;
-                } finally {
-                    this.localLoading = false;
-                }
             },
         };
     }
