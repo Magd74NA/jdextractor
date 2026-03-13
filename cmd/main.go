@@ -21,21 +21,24 @@ const usage = `jdextract — tailor resumes to job descriptions
 
 Usage:
   jdextract setup
-  jdextract generate [--local] [<url-or-file>]
-  jdextract generate --batch <url> [<url> ...]
+  jdextract generate <url>
+  jdextract generate --local <file>
+  jdextract generate --batch <url> [<url>...]
+  jdextract generate          (reads from stdin)
   jdextract list
   jdextract status <prefix> <status>
-  jdextract serve [--port <port>]
+  jdextract serve [--port <port>] [--open]
 
 Subcommands:
   setup     Initialize portable directory structure and example templates.
-  generate  Fetch or read a job description and generate tailored documents.
-            Accepts a URL (fetched via jina.ai), a local file path (--local),
-            or piped stdin.
+  generate  Generate tailored resume and cover letter from a job description.
+            Pass a URL (fetched via jina.ai), a local file path (--local),
+            multiple URLs for concurrent batch processing (--batch),
+            or pipe raw text via stdin.
   list      Print a table of processed job applications.
   status    Update the status of a job by directory prefix.
             Valid statuses: draft, applied, interviewing, offer, rejected
-  serve     Start the web interface (not yet implemented).
+  serve     Start the web UI. Defaults to port 8080; --open launches a browser.
 `
 
 func main() {
