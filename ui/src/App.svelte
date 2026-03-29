@@ -1,7 +1,7 @@
-<script>
-  import Router from 'svelte-spa-router'
+<script lang="ts">
+  import Router from "svelte-spa-router";
 
-  const routes = {}
+  const routes = {};
 </script>
 
 <Router {routes} />
