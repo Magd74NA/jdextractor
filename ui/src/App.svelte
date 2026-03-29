@@ -3,7 +3,7 @@
   import HelloWorld from "./routes/HelloWorld.svelte";
 
   const routes = {
-    "/": HelloWorld,
+    "/hello": HelloWorld,
   };
 </script>
 
