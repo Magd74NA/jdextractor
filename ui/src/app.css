@@ -1,3 +1,29 @@
+:root {
+  --text: #374151;
+  --text-h: #111827;
+  --bg: #fff;
+  --border: #e5e7eb;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --radius: 6px;
+  --sans: system-ui, -apple-system, sans-serif;
+
+  font: 15px/1.5 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --bg: #111827;
+    --border: #374151;
+    --accent: #818cf8;
+    --accent-hover: #6366f1;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -6,4 +32,10 @@
 
 body {
   margin: 0;
+}
+
+#app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
 }
