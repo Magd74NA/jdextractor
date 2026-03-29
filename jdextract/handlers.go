@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,12 +12,12 @@ import (
 	"strings"
 )
 
-//go:embed web/index.html
+//go:embed web/dist
 var webFiles embed.FS
 
 // registerRoutes attaches all HTTP handlers to mux.
 func (a *App) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/", a.handleIndex)
+	mux.Handle("/", spaHandler())
 	mux.HandleFunc("GET /api/config", a.handleGetConfig)
 	mux.HandleFunc("PATCH /api/config", a.handleUpdateConfig)
 	mux.HandleFunc("GET /api/config/prompt", a.handleGetPromptConfig)
@@ -364,13 +365,26 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 	}{Dir: dir})
 }
 
-// handleIndex serves the embedded web UI.
-func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
-	data, err := webFiles.ReadFile("web/index.html")
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(data)
+// spaHandler returns an http.Handler that serves the embedded SPA assets.
+// Non-API requests that don't match a static file fall back to index.html
+// so the client-side router can handle them.
+func spaHandler() http.Handler {
+	dist, _ := fs.Sub(webFiles, "web/dist")
+	fileServer := http.FileServer(http.FS(dist))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Try serving the file directly.
+		path := r.URL.Path
+		if path == "/" {
+			path = "index.html"
+		} else {
+			path = strings.TrimPrefix(path, "/")
+		}
+		if _, err := fs.Stat(dist, path); err == nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		// Fall back to index.html for SPA routing.
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
 }
