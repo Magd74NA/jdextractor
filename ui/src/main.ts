@@ -1,4 +1,5 @@
 import { mount } from 'svelte'
+import 'water.css/out/water.css'
 import './app.css'
 import App from './App.svelte'
 

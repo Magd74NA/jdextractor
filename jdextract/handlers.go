@@ -365,26 +365,39 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 	}{Dir: dir})
 }
 
-// spaHandler returns an http.Handler that serves the embedded SPA assets.
-// Non-API requests that don't match a static file fall back to index.html
-// so the client-side router can handle them.
+// contentTypes maps file extensions to MIME types for brotli-compressed assets.
+var contentTypes = map[string]string{
+	".html": "text/html; charset=utf-8",
+	".js":   "application/javascript",
+	".css":  "text/css",
+}
+
+// spaHandler returns an http.Handler that serves brotli-compressed embedded
+// SPA assets. All assets in dist are .br files; the handler strips the
+// extension, sets Content-Encoding and Content-Type, and streams the
+// pre-compressed bytes. Unmatched paths fall back to index.html.br for
+// client-side routing.
 func spaHandler() http.Handler {
 	dist, _ := fs.Sub(webFiles, "web/dist")
-	fileServer := http.FileServer(http.FS(dist))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Try serving the file directly.
 		path := r.URL.Path
 		if path == "/" {
 			path = "index.html"
 		} else {
 			path = strings.TrimPrefix(path, "/")
 		}
-		if _, err := fs.Stat(dist, path); err == nil {
-			fileServer.ServeHTTP(w, r)
-			return
+		brPath := path + ".br"
+		if _, err := fs.Stat(dist, brPath); err != nil {
+			// Fall back to index.html for SPA routing.
+			brPath = "index.html.br"
+			path = "index.html"
 		}
-		// Fall back to index.html for SPA routing.
-		r.URL.Path = "/"
-		fileServer.ServeHTTP(w, r)
+		ext := filepath.Ext(path)
+		if ct, ok := contentTypes[ext]; ok {
+			w.Header().Set("Content-Type", ct)
+		}
+		w.Header().Set("Content-Encoding", "br")
+		data, _ := fs.ReadFile(dist, brPath)
+		w.Write(data)
 	})
 }
