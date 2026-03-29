@@ -1,7 +1,23 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { compression } from 'vite-plugin-compression2'
+import { resolve } from 'path'
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [svelte()],
-})
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    svelte(),
+    ...(mode === 'production'
+      ? [compression({ algorithm: 'brotliCompress' })]
+      : []),
+  ],
+  build: {
+    outDir: resolve(__dirname, '../jdextract/web/dist'),
+    emptyOutDir: true,
+    minify: mode === 'production',
+  },
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8080',
+    },
+  },
+}))

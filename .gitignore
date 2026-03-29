@@ -1,5 +1,9 @@
 .DS_Store
-/out/**
-/dist/**
+/out/
+/dist/
 .api_keys
 testOutput.md
+
+# UI
+/ui/node_modules/
+/jdextract/web/dist/
