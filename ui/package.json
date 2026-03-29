@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
-    "build": "vite build --mode production",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "build": "npm run check && vite build --mode production",
     "preview": "vite preview"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260329.1",
     "svelte": "^5.55.0",
+    "svelte-check": "^4.4.5",
+    "typescript": "^6.0.2",
     "vite": "^8.0.1",
     "vite-plugin-compression2": "^2.5.3"
   },
