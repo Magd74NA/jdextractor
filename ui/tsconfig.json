@@ -1,16 +1,21 @@
 {
   "compilerOptions": {
-    "moduleResolution": "bundler",
-    "target": "ESNext",
+    "target": "ES2024",
     "module": "ESNext",
+    "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "esModuleInterop": true,
     "types": ["vite/client"],
     "skipLibCheck": true,
-    "strict": true
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.svelte"]
 }
