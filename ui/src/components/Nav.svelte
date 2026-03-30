@@ -13,7 +13,8 @@
       </li>
     </ul>
     <ul class="nav-links">
-      <li><a href="/" use:link use:active={{path: '/', className: 'active'}}>Jobs</a></li>
+      <li><a href="/" use:link use:active={{path: '/', className: 'active'}}>Dashboard</a></li>
+      <li><a href="/jobs" use:link use:active={'/jobs'}>Jobs</a></li>
       <li><a href="/process" use:link use:active={'/process'}>Process</a></li>
       <li><a href="/settings" use:link use:active={'/settings'}>Settings</a></li>
     </ul>

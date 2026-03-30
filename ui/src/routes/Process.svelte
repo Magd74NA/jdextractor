@@ -128,7 +128,7 @@
 {#if error}<p class="error">{error}</p>{/if}
 
 {#if result}
-  <p class="success">Created: {result} — <a href="/" use:link>View Applications</a></p>
+  <p class="success">Created: {result} — <a href="/jobs" use:link>View Applications</a></p>
 {/if}
 
 {#if batchResults.length > 0}
@@ -143,7 +143,7 @@
       </li>
     {/each}
   </ul>
-  <p><a href="/" use:link>View Applications</a></p>
+  <p><a href="/jobs" use:link>View Applications</a></p>
 {/if}
 
 <style>
