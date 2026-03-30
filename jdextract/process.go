@@ -59,11 +59,12 @@ func (a *App) ProcessBatch(ctx context.Context, urls []string) <-chan BatchResul
 // The LLM call is the only expensive step; no filesystem writes happen before it
 // succeeds, so a failed generation leaves no partial state on disk.
 func (a *App) Process(ctx context.Context, rawText string) (string, error) {
-	return a.ProcessWithProgress(ctx, rawText, func(ProgressEvent) {})
+	return a.ProcessWithProgress(ctx, rawText, func(_ ProgressEvent) {})
 }
 
 // ProcessWithProgress is like Process but calls onProgress at each pipeline stage.
-func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgress ProgressFunc) (string, error) {
+// During LLM generation, it also emits StageContent events with incremental text.
+func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgress func(ProgressEvent)) (string, error) {
 	onProgress(ProgressEvent{Stage: StageParsing, Message: "Parsing job description\u2026"})
 	nodes := Parse(rawText)
 
@@ -78,18 +79,24 @@ func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgres
 	}
 
 	invoker := LLMInvoker(InvokeDeepseekApi)
+	streamInvoker := StreamingLLMInvoker(InvokeDeepseekApiStream)
 	apiKey := a.Config.DeepSeekApiKey
 	model := a.Config.DeepSeekModel
 	if a.Config.Backend == "kimi" {
 		invoker = InvokeKimiApi
+		streamInvoker = InvokeKimiApiStream
 		apiKey = a.Config.KimiApiKey
 		model = a.Config.KimiModel
 	}
 
 	onProgress(ProgressEvent{Stage: StageGenerating, Message: "Generating tailored resume\u2026"})
+	onDelta := func(delta string) {
+		onProgress(ProgressEvent{Stage: StageContent, Delta: delta})
+	}
 	company, role, resume, cover, score, tokens, err := GenerateAll(
 		ctx,
 		invoker,
+		streamInvoker,
 		apiKey,
 		model,
 		&a.Client,
@@ -97,6 +104,7 @@ func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgres
 		baseResume,
 		baseCover,
 		a.PromptConfig,
+		onDelta,
 	)
 	if err != nil {
 		return "", fmt.Errorf("generate: %w", err)

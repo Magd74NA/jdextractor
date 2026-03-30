@@ -56,6 +56,7 @@ func extractTag(re *regexp.Regexp, s string) string {
 func GenerateAll(
 	ctx context.Context,
 	invoker LLMInvoker,
+	streamInvoker StreamingLLMInvoker,
 	apiKey string,
 	model string,
 	c *http.Client,
@@ -63,6 +64,7 @@ func GenerateAll(
 	baseResume string,
 	baseCover *string,
 	promptConfig PromptConfig,
+	onDelta func(string),
 ) (company, role, resume string, cover *string, score, tokensUsed int, err error) {
 	jobJSON, err := json.Marshal(nodes)
 	if err != nil {
@@ -82,13 +84,15 @@ func GenerateAll(
 		sb.WriteString(*baseCover)
 	}
 
+	useStreaming := streamInvoker != nil && onDelta != nil
+
 	reqBody := deepseekRequest{
 		Model: model,
 		Messages: []deepseekMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: sb.String()},
 		},
-		Stream: false,
+		Stream: useStreaming,
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
@@ -96,20 +100,27 @@ func GenerateAll(
 		return "", "", "", nil, 0, 0, fmt.Errorf("marshal request: %w", err)
 	}
 
-	raw, err := invoker(ctx, apiKey, c, 0, json.RawMessage(bodyBytes))
-	if err != nil {
-		return "", "", "", nil, 0, 0, err
+	var content string
+	if useStreaming {
+		content, err = streamInvoker(ctx, apiKey, c, json.RawMessage(bodyBytes), onDelta)
+		if err != nil {
+			return "", "", "", nil, 0, 0, err
+		}
+	} else {
+		raw, err := invoker(ctx, apiKey, c, 0, json.RawMessage(bodyBytes))
+		if err != nil {
+			return "", "", "", nil, 0, 0, err
+		}
+		var apiResp deepseekResponse
+		if err := json.Unmarshal([]byte(raw), &apiResp); err != nil {
+			return "", "", "", nil, 0, 0, fmt.Errorf("decode api response: %w", err)
+		}
+		if len(apiResp.Choices) == 0 {
+			return "", "", "", nil, 0, 0, fmt.Errorf("api returned no choices")
+		}
+		content = apiResp.Choices[0].Message.Content
+		tokensUsed = apiResp.Usage.TotalTokens
 	}
-
-	var apiResp deepseekResponse
-	if err := json.Unmarshal([]byte(raw), &apiResp); err != nil {
-		return "", "", "", nil, 0, 0, fmt.Errorf("decode api response: %w", err)
-	}
-	if len(apiResp.Choices) == 0 {
-		return "", "", "", nil, 0, 0, fmt.Errorf("api returned no choices")
-	}
-
-	content := apiResp.Choices[0].Message.Content
 
 	company = extractTag(companyTagRe, content)
 	role = extractTag(roleTagRe, content)
@@ -129,5 +140,5 @@ func GenerateAll(
 		return "", "", "", nil, 0, 0, fmt.Errorf("llm response missing required fields (company=%q role=%q resume_len=%d)", company, role, len(resume))
 	}
 
-	return company, role, resume, cover, score, apiResp.Usage.TotalTokens, nil
+	return company, role, resume, cover, score, tokensUsed, nil
 }

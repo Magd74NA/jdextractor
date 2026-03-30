@@ -12,12 +12,21 @@
   let loading = $state(false);
   let result = $state('');
   let progressMessage = $state('');
+  let streamContent = $state('');
   let batchResults = $state<BatchResult[]>([]);
   let error = $state('');
+  let streamEl = $state<HTMLPreElement | null>(null);
+
+  $effect(() => {
+    if (streamContent && streamEl) {
+      streamEl.scrollTop = streamEl.scrollHeight;
+    }
+  });
 
   function reset() {
     result = '';
     progressMessage = '';
+    streamContent = '';
     batchResults = [];
     error = '';
   }
@@ -29,6 +38,7 @@
     try {
       const res = await api.processStream(url, (e) => {
         if (e.message) progressMessage = e.message;
+        if (e.delta) streamContent += e.delta;
       });
       result = res.dir;
       await refreshJobs();
@@ -62,6 +72,7 @@
     try {
       const res = await api.processLocalStream(content, (e) => {
         if (e.message) progressMessage = e.message;
+        if (e.delta) streamContent += e.delta;
       });
       result = res.dir;
       await refreshJobs();
@@ -110,6 +121,10 @@
   </button>
 {/if}
 
+{#if streamContent}
+  <pre class="stream-output" bind:this={streamEl}>{streamContent}</pre>
+{/if}
+
 {#if error}<p class="error">{error}</p>{/if}
 
 {#if result}
@@ -152,5 +167,19 @@
 
   .fail {
     color: var(--pico-del-color);
+  }
+
+  .stream-output {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-top: 1rem;
   }
 </style>

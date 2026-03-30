@@ -46,6 +46,7 @@ export interface ProgressEvent {
   stage: string;
   message?: string;
   dir?: string;
+  delta?: string;
 }
 
 export type JobStatus = 'draft' | 'applied' | 'interviewing' | 'offer' | 'rejected';
