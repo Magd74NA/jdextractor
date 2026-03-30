@@ -40,25 +40,69 @@
     {#if loading}
       <p aria-busy="true">Loading templates...</p>
     {:else if loaded}
-      <label>
-        Resume Template
+      <div class="file-section">
+        <div class="file-header">
+          <h4>Resume Template</h4>
+          <div class="file-actions">
+            {#if resumeSaved}<small class="success">Saved!</small>{/if}
+            <button class="outline" onclick={saveResume}>Save</button>
+          </div>
+        </div>
         <textarea rows={8} bind:value={resume}></textarea>
-      </label>
-      <button onclick={saveResume}>Save Resume</button>
-      {#if resumeSaved}<small class="success">Saved!</small>{/if}
+      </div>
 
-      <label>
-        Cover Letter Template
+      <div class="file-section">
+        <div class="file-header">
+          <h4>Cover Letter Template</h4>
+          <div class="file-actions">
+            {#if coverSaved}<small class="success">Saved!</small>{/if}
+            <button class="outline" onclick={saveCover}>Save</button>
+          </div>
+        </div>
         <textarea rows={8} bind:value={cover}></textarea>
-      </label>
-      <button onclick={saveCover}>Save Cover</button>
-      {#if coverSaved}<small class="success">Saved!</small>{/if}
+      </div>
     {/if}
   </CollapsibleCard>
 
 <style>
+  .file-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .file-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .file-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .file-header h4 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .file-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .file-actions button {
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0;
+  }
+
+  textarea {
+    font-family: monospace;
+    font-size: 0.85rem;
+    margin-bottom: 0;
+  }
+
   .success {
     color: var(--pico-ins-color);
-    margin-left: 0.5rem;
   }
 </style>

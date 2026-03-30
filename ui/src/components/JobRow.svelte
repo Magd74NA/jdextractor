@@ -69,9 +69,9 @@
       {/each}
     </select>
   </td>
-  <td>
-    <button class="outline" onclick={toggle}>{expanded ? '▲' : '▼'}</button>
-    <button class="outline danger-btn" onclick={deleteJob}>Delete</button>
+  <td class="actions-cell">
+    <button class="outline btn-sm" onclick={toggle}>{expanded ? '▲' : '▼'}</button>
+    <button class="outline btn-sm danger-btn" onclick={deleteJob}>✕</button>
   </td>
 </tr>
 
@@ -81,20 +81,28 @@
       {#if filesLoading}
         <p aria-busy="true">Loading files...</p>
       {:else}
-        <label>
-          Resume
-          <textarea rows={6} bind:value={resume}></textarea>
-        </label>
-        <button onclick={saveResume}>Save Resume</button>
-        {#if resumeSaved}<small class="success">Saved!</small>{/if}
+        <div class="file-section">
+          <div class="file-header">
+            <h4>Resume</h4>
+            <div class="file-actions">
+              {#if resumeSaved}<small class="success">Saved!</small>{/if}
+              <button class="outline btn-sm" onclick={saveResume}>Save</button>
+            </div>
+          </div>
+          <textarea rows={8} bind:value={resume}></textarea>
+        </div>
 
         {#if cover !== undefined}
-          <label>
-            Cover Letter
-            <textarea rows={6} bind:value={cover}></textarea>
-          </label>
-          <button onclick={saveCover}>Save Cover</button>
-          {#if coverSaved}<small class="success">Saved!</small>{/if}
+          <div class="file-section">
+            <div class="file-header">
+              <h4>Cover Letter</h4>
+              <div class="file-actions">
+                {#if coverSaved}<small class="success">Saved!</small>{/if}
+                <button class="outline btn-sm" onclick={saveCover}>Save</button>
+              </div>
+            </div>
+            <textarea rows={8} bind:value={cover}></textarea>
+          </div>
         {/if}
       {/if}
     </td>
@@ -125,26 +133,62 @@
     color: #991b1b;
   }
 
+  .actions-cell {
+    white-space: nowrap;
+  }
+
+  .btn-sm {
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0;
+  }
+
   .danger-btn {
     color: var(--pico-del-color);
     border-color: var(--pico-del-color);
   }
 
   .expanded-row td {
-    padding: 1rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--pico-muted-border-color);
+  }
+
+  .file-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .file-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .file-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .file-header h4 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .file-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  textarea {
+    font-family: monospace;
+    font-size: 0.85rem;
+    margin-bottom: 0;
   }
 
   .success {
     color: var(--pico-ins-color);
-    margin-left: 0.5rem;
   }
 
   select {
-    margin-bottom: 0;
-    padding: 0.25rem 0.5rem;
-  }
-
-  td button {
     margin-bottom: 0;
     padding: 0.25rem 0.5rem;
   }

@@ -27,7 +27,7 @@
       deepseekApiKey = config.deepseek_api_key;
       kimiApiKey = config.kimi_api_key;
       kimiModel = config.kimi_model;
-      port = config.port;
+      port = config.port || 8080;
     }
   });
 
