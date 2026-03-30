@@ -156,6 +156,37 @@ func DeleteJob(a *App, dir string) error {
 	return os.RemoveAll(path)
 }
 
+// UpdateJobMeta updates editable metadata fields (company, role, date) for a job.
+// id must be the exact directory name.
+func UpdateJobMeta(a *App, id string, company, role, date *string) error {
+	if id == "" || id == "." || st.Contains(id, "/") || st.Contains(id, "\\") {
+		return fmt.Errorf("invalid job id %q", id)
+	}
+	metaPath := filepath.Join(a.Paths.Jobs, id, "meta.json")
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return fmt.Errorf("read meta.json: %w", err)
+	}
+	var m ApplicationMeta
+	if err := json.Unmarshal(data, &m); err != nil {
+		return fmt.Errorf("parse meta.json: %w", err)
+	}
+	if company != nil {
+		m.Company = *company
+	}
+	if role != nil {
+		m.Role = *role
+	}
+	if date != nil {
+		m.Date = *date
+	}
+	out, err := json.Marshal(m)
+	if err != nil {
+		return fmt.Errorf("marshal meta: %w", err)
+	}
+	return os.WriteFile(metaPath, out, 0644)
+}
+
 // UpdateJobStatus finds a job by directory prefix and updates its status in meta.json.
 func UpdateJobStatus(a *App, prefix, status string) error {
 	if !slices.Contains(validStatuses, status) {

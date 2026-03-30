@@ -59,19 +59,19 @@
 ## Phase 5: Web Interface
 
 ### Backend (`web.go`)
-- [ ] `Serve(ctx, port, ui)` — accepts context for graceful shutdown via `http.Server.Shutdown(ctx)`
-- [ ] `POST /api/process` — wraps `Process()` with `context.WithTimeout` (300s)
-- [ ] `GET /api/jobs` — list with filtering/sorting; tolerates corrupt `meta.json` (log + skip)
-- [ ] `GET /api/jobs/{id}` — returns job metadata from `meta.json`; extended metadata type TBD for Phase 5
-- [ ] `PATCH /api/jobs/{id}` — writable: `status`, `date_applied`, `notes` only; reject read-only fields
-- [ ] CSRF: reject when `Origin` present and doesn't match `localhost:{port}`; require `Content-Type: application/json` on POST/PATCH
+- [x] `Serve(ctx, port, ui)` — accepts context for graceful shutdown via `http.Server.Shutdown(ctx)`
+- [x] `POST /api/process` — wraps `Process()` with `context.WithTimeout` (300s)
+- [x] `GET /api/jobs` — list with filtering/sorting; tolerates corrupt `meta.json` (log + skip)
+- [x] `GET /api/jobs/{id}` — returns job metadata from `meta.json`; extended metadata type TBD for Phase 5
+- [x] `PATCH /api/jobs/{id}` — writable: `status`, `date_applied`, `notes` only; reject read-only fields
+- [x] CSRF: reject when `Origin` present and doesn't match `localhost:{port}`; require `Content-Type: application/json` on POST/PATCH
 
 ### Frontend (`cmd/web/index.html`)
-- [ ] Single HTML file: Alpine.js + Tailwind + DaisyUI (all CDN)
-- [ ] Job URL input + textarea for raw text paste + "Generate" button
-- [ ] Generated text display with file paths and token usage
-- [ ] Job list with status badges, filtering, sorting
-- [ ] Loading spinner with timeout-specific error message
+- [x] Single HTML file: Alpine.js + Tailwind + DaisyUI (all CDN)
+- [x] Job URL input + textarea for raw text paste + "Generate" button
+- [x] Generated text display with file paths and token usage
+- [x] Job list with status badges, filtering, sorting
+- [x] Loading spinner with timeout-specific error message
 
 ---
 

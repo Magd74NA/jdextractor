@@ -1,0 +1,40 @@
+body {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 2rem;
+}
+
+/* Active nav link */
+:global(a.active) {
+  font-weight: 700;
+}
+
+/* Page header with title + action button */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.page-header h2 {
+  margin-bottom: 0;
+}
+
+/* Tighten buttons */
+button {
+  width: auto;
+}
+
+.outline {
+  padding: 0.4rem 0.75rem;
+}
+
+/* Status messages */
+small.success {
+  color: var(--pico-ins-color);
+}
+
+small.error {
+  color: var(--pico-del-color);
+}

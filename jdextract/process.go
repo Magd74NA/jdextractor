@@ -59,6 +59,13 @@ func (a *App) ProcessBatch(ctx context.Context, urls []string) <-chan BatchResul
 // The LLM call is the only expensive step; no filesystem writes happen before it
 // succeeds, so a failed generation leaves no partial state on disk.
 func (a *App) Process(ctx context.Context, rawText string) (string, error) {
+	return a.ProcessWithProgress(ctx, rawText, func(_ ProgressEvent) {})
+}
+
+// ProcessWithProgress is like Process but calls onProgress at each pipeline stage.
+// During LLM generation, it also emits StageContent events with incremental text.
+func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgress func(ProgressEvent)) (string, error) {
+	onProgress(ProgressEvent{Stage: StageParsing, Message: "Parsing job description\u2026"})
 	nodes := Parse(rawText)
 
 	baseResume, err := fetchResume(a)
@@ -72,17 +79,24 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 	}
 
 	invoker := LLMInvoker(InvokeDeepseekApi)
+	streamInvoker := StreamingLLMInvoker(InvokeDeepseekApiStream)
 	apiKey := a.Config.DeepSeekApiKey
 	model := a.Config.DeepSeekModel
 	if a.Config.Backend == "kimi" {
 		invoker = InvokeKimiApi
+		streamInvoker = InvokeKimiApiStream
 		apiKey = a.Config.KimiApiKey
 		model = a.Config.KimiModel
 	}
 
+	onProgress(ProgressEvent{Stage: StageGenerating, Message: "Generating tailored resume\u2026"})
+	onDelta := func(delta string) {
+		onProgress(ProgressEvent{Stage: StageContent, Delta: delta})
+	}
 	company, role, resume, cover, score, tokens, err := GenerateAll(
 		ctx,
 		invoker,
+		streamInvoker,
 		apiKey,
 		model,
 		&a.Client,
@@ -90,11 +104,13 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 		baseResume,
 		baseCover,
 		a.PromptConfig,
+		onDelta,
 	)
 	if err != nil {
 		return "", fmt.Errorf("generate: %w", err)
 	}
 
+	onProgress(ProgressEvent{Stage: StageSaving, Message: "Saving files\u2026"})
 	slug := slugify(nodes) //NEED TO UPDATE TO NOT USE NODES MAYBE?
 	if err := createApplicationDirectory(slug, a); err != nil {
 		return "", fmt.Errorf("create directory: %w", err)

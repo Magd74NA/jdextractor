@@ -4,6 +4,8 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,12 +13,12 @@ import (
 	"strings"
 )
 
-//go:embed web/index.html
+//go:embed web/dist
 var webFiles embed.FS
 
 // registerRoutes attaches all HTTP handlers to mux.
 func (a *App) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/", a.handleIndex)
+	mux.Handle("/", spaHandler())
 	mux.HandleFunc("GET /api/config", a.handleGetConfig)
 	mux.HandleFunc("PATCH /api/config", a.handleUpdateConfig)
 	mux.HandleFunc("GET /api/config/prompt", a.handleGetPromptConfig)
@@ -29,9 +31,37 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/jobs/{id}", a.handleUpdateJobStatus)
 	mux.HandleFunc("DELETE /api/jobs/{id}", a.handleDeleteJob)
 	mux.HandleFunc("POST /api/process", a.handleProcess)
+	mux.HandleFunc("POST /api/process/stream", a.handleProcessStream)
 	mux.HandleFunc("POST /api/process/batch", a.handleProcessBatch)
 	mux.HandleFunc("POST /api/process/local", a.handleProcessLocal)
+	mux.HandleFunc("POST /api/process/local/stream", a.handleProcessLocalStream)
 }
+
+// writeJSON sets Content-Type and encodes v as JSON.
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}
+
+// decodeBody decodes JSON from r.Body into v. Returns false and writes a 400
+// on failure so callers can early-return immediately.
+func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+// validID rejects job IDs that could escape the jobs directory.
+func validID(id string) bool {
+	return id != "" && id != "." && !strings.Contains(id, "/") && !strings.Contains(id, "\\")
+}
+
+var (
+	validDeepSeekModels = []string{"deepseek-chat", "deepseek-reasoner"}
+	validBackends       = []string{"deepseek", "kimi"}
+)
 
 // handleGetTemplates returns the current resume and cover letter templates.
 func (a *App) handleGetTemplates(w http.ResponseWriter, r *http.Request) {
@@ -45,8 +75,7 @@ func (a *App) handleGetTemplates(w http.ResponseWriter, r *http.Request) {
 	if b, err := os.ReadFile(filepath.Join(a.Paths.Templates, "cover.txt")); err == nil {
 		out.Cover = string(b)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	writeJSON(w, out)
 }
 
 // handleSaveTemplates writes resume.txt and/or cover.txt to the templates directory.
@@ -56,8 +85,7 @@ func (a *App) handleSaveTemplates(w http.ResponseWriter, r *http.Request) {
 		Resume *string `json:"resume"`
 		Cover  *string `json:"cover"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	if body.Resume != nil {
@@ -79,7 +107,7 @@ func (a *App) handleSaveTemplates(w http.ResponseWriter, r *http.Request) {
 // for a job identified by its exact directory name.
 func (a *App) handleGetJobFiles(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if id == "" || id == "." || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+	if !validID(id) {
 		http.Error(w, "invalid job id", http.StatusBadRequest)
 		return
 	}
@@ -103,16 +131,14 @@ func (a *App) handleGetJobFiles(w http.ResponseWriter, r *http.Request) {
 	if coverBytes, err := os.ReadFile(filepath.Join(dir, "cover.txt")); err == nil {
 		out.Cover = string(coverBytes)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	writeJSON(w, out)
 }
 
 // handleSaveJobFiles writes resume.txt and/or cover.txt for a job.
-// Only non-empty fields in the body are written; omitted fields are left untouched.
+// Only non-nil fields in the body are written; omitted fields are left untouched.
 func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if id == "" || id == "." || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+	if !validID(id) {
 		http.Error(w, "invalid job id", http.StatusBadRequest)
 		return
 	}
@@ -120,8 +146,7 @@ func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
 		Resume *string `json:"resume"`
 		Cover  *string `json:"cover"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	dir := filepath.Join(a.Paths.Jobs, id)
@@ -140,21 +165,14 @@ func (a *App) handleSaveJobFiles(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-var (
-	validDeepSeekModels = []string{"deepseek-chat", "deepseek-reasoner"}
-	validBackends       = []string{"deepseek", "kimi"}
-)
-
 // handleGetConfig returns the current in-memory Config as JSON.
 func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(a.Config)
+	writeJSON(w, a.Config)
 }
 
-// handleGetConfig returns the current in-memory Prompt Config as JSON.
+// handleGetPromptConfig returns the current in-memory PromptConfig as JSON.
 func (a *App) handleGetPromptConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(a.PromptConfig)
+	writeJSON(w, a.PromptConfig)
 }
 
 // handleUpdateConfig applies a partial config update, persists it to disk, and
@@ -168,8 +186,7 @@ func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Backend        *string `json:"backend"`
 		Port           *int    `json:"port"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	if body.DeepSeekModel != nil && !slices.Contains(validDeepSeekModels, *body.DeepSeekModel) {
@@ -213,8 +230,7 @@ func (a *App) handleUpdatePromptConfig(w http.ResponseWriter, r *http.Request) {
 		TaskList     *string `json:"task_list"`
 		SystemPrompt *string `json:"system_prompt"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	if body.TaskList != nil {
@@ -250,23 +266,33 @@ func (a *App) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	for i, j := range jobs {
 		out[i] = jobResponse{ApplicationMeta: j, Dir: j.Dir}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	writeJSON(w, out)
 }
 
-// handleUpdateJobStatus decodes {"status":"..."} and updates the job's meta.json.
+// handleUpdateJobStatus decodes a partial job update and applies it to meta.json.
+// Accepts any combination of status, company, role, and date fields.
 func (a *App) handleUpdateJobStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {
-		Status string `json:"status"`
+		Status  *string `json:"status"`
+		Company *string `json:"company"`
+		Role    *string `json:"role"`
+		Date    *string `json:"date"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
-	if err := UpdateJobStatus(a, id, body.Status); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	if body.Status != nil {
+		if err := UpdateJobStatus(a, id, *body.Status); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if body.Company != nil || body.Role != nil || body.Date != nil {
+		if err := UpdateJobMeta(a, id, body.Company, body.Role, body.Date); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -287,8 +313,8 @@ func (a *App) handleProcess(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		URL string `json:"url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.URL == "" {
-		http.Error(w, "invalid JSON body: url required", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) || body.URL == "" {
+		http.Error(w, "url required", http.StatusBadRequest)
 		return
 	}
 	raw, err := FetchJobDescription(r.Context(), body.URL, &a.Client, 0)
@@ -301,8 +327,7 @@ func (a *App) handleProcess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "process error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(struct {
+	writeJSON(w, struct {
 		Dir string `json:"dir"`
 	}{Dir: dir})
 }
@@ -320,8 +345,8 @@ func (a *App) handleProcessBatch(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		URLs []string `json:"urls"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.URLs) == 0 {
-		http.Error(w, "invalid JSON body: urls required", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) || len(body.URLs) == 0 {
+		http.Error(w, "urls required", http.StatusBadRequest)
 		return
 	}
 	var results []batchItemResult
@@ -332,8 +357,7 @@ func (a *App) handleProcessBatch(w http.ResponseWriter, r *http.Request) {
 		}
 		results = append(results, res)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	writeJSON(w, results)
 }
 
 // handleProcessLocal accepts {"content":"..."} (raw job description text) and
@@ -342,8 +366,8 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Content string `json:"content"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" {
-		http.Error(w, "invalid JSON body: content required", http.StatusBadRequest)
+	if !decodeBody(w, r, &body) || body.Content == "" {
+		http.Error(w, "content required", http.StatusBadRequest)
 		return
 	}
 	dir, err := a.Process(r.Context(), body.Content)
@@ -351,19 +375,120 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "process error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(struct {
+	writeJSON(w, struct {
 		Dir string `json:"dir"`
 	}{Dir: dir})
 }
 
-// handleIndex serves the embedded web UI.
-func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
-	data, err := webFiles.ReadFile("web/index.html")
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+// writeSSE marshals a ProgressEvent as an SSE data line and flushes.
+func writeSSE(w http.ResponseWriter, flusher http.Flusher, event ProgressEvent) {
+	data, _ := json.Marshal(event)
+	fmt.Fprintf(w, "data: %s\n\n", data)
+	flusher.Flush()
+}
+
+// initSSE sets SSE headers and returns the Flusher. Returns nil if not supported.
+func initSSE(w http.ResponseWriter) http.Flusher {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return nil
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	return flusher
+}
+
+// handleProcessStream is the SSE variant of handleProcess. It streams progress
+// events as the pipeline runs: fetching → parsing → generating → saving → complete.
+func (a *App) handleProcessStream(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if !decodeBody(w, r, &body) || body.URL == "" {
+		http.Error(w, "url required", http.StatusBadRequest)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(data)
+	flusher := initSSE(w)
+	if flusher == nil {
+		return
+	}
+
+	writeSSE(w, flusher, ProgressEvent{Stage: StageFetching, Message: "Fetching job description\u2026"})
+	raw, err := FetchJobDescription(r.Context(), body.URL, &a.Client, 0)
+	if err != nil {
+		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "fetch error: " + err.Error()})
+		return
+	}
+
+	dir, err := a.ProcessWithProgress(r.Context(), raw, func(e ProgressEvent) {
+		writeSSE(w, flusher, e)
+	})
+	if err != nil {
+		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "process error: " + err.Error()})
+		return
+	}
+	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Dir: dir})
+}
+
+// handleProcessLocalStream is the SSE variant of handleProcessLocal.
+// Streams progress events: parsing → generating → saving → complete.
+func (a *App) handleProcessLocalStream(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if !decodeBody(w, r, &body) || body.Content == "" {
+		http.Error(w, "content required", http.StatusBadRequest)
+		return
+	}
+	flusher := initSSE(w)
+	if flusher == nil {
+		return
+	}
+
+	dir, err := a.ProcessWithProgress(r.Context(), body.Content, func(e ProgressEvent) {
+		writeSSE(w, flusher, e)
+	})
+	if err != nil {
+		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "process error: " + err.Error()})
+		return
+	}
+	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Dir: dir})
+}
+
+// contentTypes maps file extensions to MIME types for gzip-compressed assets.
+var contentTypes = map[string]string{
+	".html": "text/html; charset=utf-8",
+	".js":   "application/javascript",
+	".css":  "text/css",
+}
+
+// spaHandler returns an http.Handler that serves gzip-compressed embedded
+// SPA assets. All assets in dist are .gz files; the handler sets
+// Content-Encoding and Content-Type, and streams the pre-compressed bytes.
+// Unmatched paths fall back to index.html.gz for client-side routing.
+func spaHandler() http.Handler {
+	dist, _ := fs.Sub(webFiles, "web/dist")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "/" {
+			path = "index.html"
+		} else {
+			path = strings.TrimPrefix(path, "/")
+		}
+		gzPath := path + ".gz"
+		if _, err := fs.Stat(dist, gzPath); err != nil {
+			// Fall back to index.html for SPA routing.
+			gzPath = "index.html.gz"
+			path = "index.html"
+		}
+		ext := filepath.Ext(path)
+		if ct, ok := contentTypes[ext]; ok {
+			w.Header().Set("Content-Type", ct)
+		}
+		w.Header().Set("Content-Encoding", "gzip")
+		data, _ := fs.ReadFile(dist, gzPath)
+		w.Write(data)
+	})
 }
