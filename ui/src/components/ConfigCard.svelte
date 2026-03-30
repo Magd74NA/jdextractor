@@ -19,7 +19,7 @@
   let deepseekModel = $state("deepseek-chat");
   let deepseekApiKey = $state("");
   let kimiApiKey = $state("");
-  let kimiModel = $state("kimi-k2.5");
+  let kimiModel = $state("moonshotai/Kimi-K2.5");
   let port = $state(8080);
   let systemPrompt = $state("");
   let taskList = $state("");
@@ -46,15 +46,19 @@
     saving = true;
     error = "";
     try {
+      const configUpdate: Record<string, any> = {
+        backend,
+        port,
+      };
+      if (backend === "deepseek") {
+        configUpdate.deepseek_model = deepseekModel;
+        configUpdate.deepseek_api_key = deepseekApiKey;
+      } else {
+        configUpdate.kimi_api_key = kimiApiKey;
+        configUpdate.kimi_model = kimiModel;
+      }
       await Promise.all([
-        api.saveConfig({
-          backend,
-          deepseek_model: deepseekModel,
-          deepseek_api_key: deepseekApiKey,
-          kimi_api_key: kimiApiKey,
-          kimi_model: kimiModel,
-          port,
-        }),
+        api.saveConfig(configUpdate),
         api.savePromptConfig({
           system_prompt: systemPrompt,
           task_list: taskList,
@@ -109,7 +113,14 @@
     </label>
   {:else}
     <label>
-      <h4>Kimi API Key</h4>
+      <h4>Model</h4>
+      <select bind:value={kimiModel}>
+        <option value="moonshotai/Kimi-K2.5">Kimi K2.5</option>
+      </select>
+    </label>
+
+    <label>
+      <h4>API Key</h4>
       <div class="key-row">
         {#if showApiKey}
           <input type="text" bind:value={kimiApiKey} placeholder="Co1I3p..." />

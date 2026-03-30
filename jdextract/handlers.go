@@ -60,6 +60,7 @@ func validID(id string) bool {
 
 var (
 	validDeepSeekModels = []string{"deepseek-chat", "deepseek-reasoner"}
+	validKimiModels     = []string{"moonshotai/Kimi-K2.5"}
 	validBackends       = []string{"deepseek", "kimi"}
 )
 
@@ -191,6 +192,10 @@ func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.DeepSeekModel != nil && !slices.Contains(validDeepSeekModels, *body.DeepSeekModel) {
 		http.Error(w, "invalid model: must be deepseek-chat or deepseek-reasoner", http.StatusBadRequest)
+		return
+	}
+	if body.KimiModel != nil && !slices.Contains(validKimiModels, *body.KimiModel) {
+		http.Error(w, "invalid model: must be moonshotai/Kimi-K2.5", http.StatusBadRequest)
 		return
 	}
 	if body.Backend != nil && !slices.Contains(validBackends, *body.Backend) {
