@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     svelte(),
     ...(mode === 'production'
-      ? [compression({ algorithm: 'brotliCompress' })]
+      ? [compression({ algorithm: 'gzip' })]
       : []),
   ],
   build: {

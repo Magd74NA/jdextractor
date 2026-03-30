@@ -1,5 +1,30 @@
 body {
   max-width: 960px;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 1rem 16px 2rem;
+}
+
+h1 {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+/* Tighten buttons inside cards */
+button {
+  width: auto;
+}
+
+/* Inline buttons beside inputs */
+.outline {
+  padding: 0.4rem 0.75rem;
+}
+
+/* Status messages */
+small.success {
+  color: var(--pico-ins-color);
+}
+
+small.error {
+  color: var(--pico-del-color);
 }

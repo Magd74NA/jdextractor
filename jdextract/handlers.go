@@ -365,18 +365,17 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 	}{Dir: dir})
 }
 
-// contentTypes maps file extensions to MIME types for brotli-compressed assets.
+// contentTypes maps file extensions to MIME types for gzip-compressed assets.
 var contentTypes = map[string]string{
 	".html": "text/html; charset=utf-8",
 	".js":   "application/javascript",
 	".css":  "text/css",
 }
 
-// spaHandler returns an http.Handler that serves brotli-compressed embedded
-// SPA assets. All assets in dist are .br files; the handler strips the
-// extension, sets Content-Encoding and Content-Type, and streams the
-// pre-compressed bytes. Unmatched paths fall back to index.html.br for
-// client-side routing.
+// spaHandler returns an http.Handler that serves gzip-compressed embedded
+// SPA assets. All assets in dist are .gz files; the handler sets
+// Content-Encoding and Content-Type, and streams the pre-compressed bytes.
+// Unmatched paths fall back to index.html.gz for client-side routing.
 func spaHandler() http.Handler {
 	dist, _ := fs.Sub(webFiles, "web/dist")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -386,18 +385,18 @@ func spaHandler() http.Handler {
 		} else {
 			path = strings.TrimPrefix(path, "/")
 		}
-		brPath := path + ".br"
-		if _, err := fs.Stat(dist, brPath); err != nil {
+		gzPath := path + ".gz"
+		if _, err := fs.Stat(dist, gzPath); err != nil {
 			// Fall back to index.html for SPA routing.
-			brPath = "index.html.br"
+			gzPath = "index.html.gz"
 			path = "index.html"
 		}
 		ext := filepath.Ext(path)
 		if ct, ok := contentTypes[ext]; ok {
 			w.Header().Set("Content-Type", ct)
 		}
-		w.Header().Set("Content-Encoding", "br")
-		data, _ := fs.ReadFile(dist, brPath)
+		w.Header().Set("Content-Encoding", "gzip")
+		data, _ := fs.ReadFile(dist, gzPath)
 		w.Write(data)
 	})
 }

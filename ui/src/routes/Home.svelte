@@ -1,21 +1,24 @@
 <script lang="ts">
-  import { push } from "svelte-spa-router";
+  import { loadConfig, loadPromptConfig } from '../lib/stores.svelte';
+  import ConfigCard from '../components/ConfigCard.svelte';
+  import TemplatesCard from '../components/TemplatesCard.svelte';
+  import ProcessUrl from '../components/ProcessUrl.svelte';
+  import ProcessBatch from '../components/ProcessBatch.svelte';
+  import ProcessLocal from '../components/ProcessLocal.svelte';
+  import JobsTable from '../components/JobsTable.svelte';
+
+  async function init() {
+    await Promise.all([loadConfig(), loadPromptConfig()]);
+  }
+
+  init();
 </script>
 
-<div class="home">
-  <h1>jdextractor</h1>
-  <p>Job description extractor and resume tailor.</p>
-  <button onclick={() => push("/hello")}>Hello World</button>
-</div>
+<h1>jdextractor</h1>
 
-<style>
-  .home {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 60vh;
-    text-align: center;
-    gap: 0.5rem;
-  }
-</style>
+<ConfigCard />
+<TemplatesCard />
+<ProcessUrl />
+<ProcessBatch />
+<ProcessLocal />
+<JobsTable />

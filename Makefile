@@ -10,7 +10,7 @@ ui-dev:
 
 ui-build:
 	cd ui && npm run build
-	find jdextract/web/dist -type f ! -name '*.br' -delete
+	find jdextract/web/dist -type f ! -name '*.gz' -delete
 
 ui-clean:
 	rm -rf jdextract/web/dist
