@@ -179,6 +179,12 @@ func cmdGenerate(args []string) {
 	var raw string
 	var err error
 
+	progress := func(e jdextract.ProgressEvent) {
+		if e.Message != "" {
+			fmt.Fprintf(os.Stderr, "%s\n", e.Message)
+		}
+	}
+
 	if *local {
 		if fs.NArg() < 1 {
 			fmt.Fprintln(os.Stderr, "error: --local requires a file path argument")
@@ -190,6 +196,7 @@ func cmdGenerate(args []string) {
 			os.Exit(1)
 		}
 	} else if fs.NArg() >= 1 {
+		fmt.Fprintf(os.Stderr, "Fetching job description\u2026\n")
 		raw, err = jdextract.FetchJobDescription(context.Background(), fs.Arg(0), &app.Client, 0)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fetch error: %s\n", err)
@@ -210,7 +217,7 @@ func cmdGenerate(args []string) {
 		raw = string(data)
 	}
 
-	dir, err := app.Process(context.Background(), raw)
+	dir, err := app.ProcessWithProgress(context.Background(), raw, progress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "process error: %s\n", err)
 		os.Exit(1)

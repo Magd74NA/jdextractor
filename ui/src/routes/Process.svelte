@@ -11,11 +11,13 @@
   let content = $state('');
   let loading = $state(false);
   let result = $state('');
+  let progressMessage = $state('');
   let batchResults = $state<BatchResult[]>([]);
   let error = $state('');
 
   function reset() {
     result = '';
+    progressMessage = '';
     batchResults = [];
     error = '';
   }
@@ -25,13 +27,16 @@
     loading = true;
     reset();
     try {
-      const res = await api.process(url);
+      const res = await api.processStream(url, (e) => {
+        if (e.message) progressMessage = e.message;
+      });
       result = res.dir;
       await refreshJobs();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Process failed';
     } finally {
       loading = false;
+      progressMessage = '';
     }
   }
 
@@ -55,13 +60,16 @@
     loading = true;
     reset();
     try {
-      const res = await api.processLocal(content);
+      const res = await api.processLocalStream(content, (e) => {
+        if (e.message) progressMessage = e.message;
+      });
       result = res.dir;
       await refreshJobs();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Process failed';
     } finally {
       loading = false;
+      progressMessage = '';
     }
   }
 </script>
@@ -80,7 +88,7 @@
     <input type="url" bind:value={url} placeholder="https://..." />
   </label>
   <button onclick={submitUrl} disabled={loading || !url}>
-    {loading ? 'Generating...' : 'Generate'}
+    {loading ? (progressMessage || 'Starting\u2026') : 'Generate'}
   </button>
 
 {:else if mode === 'batch'}
@@ -98,7 +106,7 @@
     <textarea rows={8} bind:value={content} placeholder="Paste the full job description here..."></textarea>
   </label>
   <button onclick={submitLocal} disabled={loading || !content.trim()}>
-    {loading ? 'Generating...' : 'Generate'}
+    {loading ? (progressMessage || 'Starting\u2026') : 'Generate'}
   </button>
 {/if}
 

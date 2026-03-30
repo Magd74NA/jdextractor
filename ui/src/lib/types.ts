@@ -42,6 +42,12 @@ export interface ProcessResult {
   dir: string;
 }
 
+export interface ProgressEvent {
+  stage: string;
+  message?: string;
+  dir?: string;
+}
+
 export type JobStatus = 'draft' | 'applied' | 'interviewing' | 'offer' | 'rejected';
 
 export const JOB_STATUSES: JobStatus[] = ['draft', 'applied', 'interviewing', 'offer', 'rejected'];

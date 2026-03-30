@@ -59,6 +59,12 @@ func (a *App) ProcessBatch(ctx context.Context, urls []string) <-chan BatchResul
 // The LLM call is the only expensive step; no filesystem writes happen before it
 // succeeds, so a failed generation leaves no partial state on disk.
 func (a *App) Process(ctx context.Context, rawText string) (string, error) {
+	return a.ProcessWithProgress(ctx, rawText, func(ProgressEvent) {})
+}
+
+// ProcessWithProgress is like Process but calls onProgress at each pipeline stage.
+func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgress ProgressFunc) (string, error) {
+	onProgress(ProgressEvent{Stage: StageParsing, Message: "Parsing job description\u2026"})
 	nodes := Parse(rawText)
 
 	baseResume, err := fetchResume(a)
@@ -80,6 +86,7 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 		model = a.Config.KimiModel
 	}
 
+	onProgress(ProgressEvent{Stage: StageGenerating, Message: "Generating tailored resume\u2026"})
 	company, role, resume, cover, score, tokens, err := GenerateAll(
 		ctx,
 		invoker,
@@ -95,6 +102,7 @@ func (a *App) Process(ctx context.Context, rawText string) (string, error) {
 		return "", fmt.Errorf("generate: %w", err)
 	}
 
+	onProgress(ProgressEvent{Stage: StageSaving, Message: "Saving files\u2026"})
 	slug := slugify(nodes) //NEED TO UPDATE TO NOT USE NODES MAYBE?
 	if err := createApplicationDirectory(slug, a); err != nil {
 		return "", fmt.Errorf("create directory: %w", err)

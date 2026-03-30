@@ -1,4 +1,4 @@
-import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult } from './types';
+import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult, ProgressEvent } from './types';
 
 const BASE = '/api';
 
@@ -35,4 +35,52 @@ export const api = {
   process: (url: string) => request<ProcessResult>('POST', '/process', { url }),
   processBatch: (urls: string[]) => request<BatchResult[]>('POST', '/process/batch', { urls }),
   processLocal: (content: string) => request<ProcessResult>('POST', '/process/local', { content }),
+  processStream: (url: string, onProgress: (event: ProgressEvent) => void) =>
+    consumeSSE(`${BASE}/process/stream`, { url }, onProgress),
+  processLocalStream: (content: string, onProgress: (event: ProgressEvent) => void) =>
+    consumeSSE(`${BASE}/process/local/stream`, { content }, onProgress),
 };
+
+async function consumeSSE(
+  url: string,
+  body: unknown,
+  onProgress: (event: ProgressEvent) => void,
+): Promise<ProcessResult> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result: ProcessResult | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop()!;
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const event: ProgressEvent = JSON.parse(line.slice(6));
+      if (event.stage === 'error') {
+        throw new Error(event.message || 'Processing failed');
+      }
+      if (event.stage === 'complete') {
+        result = { dir: event.dir! };
+      }
+      onProgress(event);
+    }
+  }
+
+  if (!result) throw new Error('Stream ended without completion');
+  return result;
+}

@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -30,8 +31,10 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/jobs/{id}", a.handleUpdateJobStatus)
 	mux.HandleFunc("DELETE /api/jobs/{id}", a.handleDeleteJob)
 	mux.HandleFunc("POST /api/process", a.handleProcess)
+	mux.HandleFunc("POST /api/process/stream", a.handleProcessStream)
 	mux.HandleFunc("POST /api/process/batch", a.handleProcessBatch)
 	mux.HandleFunc("POST /api/process/local", a.handleProcessLocal)
+	mux.HandleFunc("POST /api/process/local/stream", a.handleProcessLocalStream)
 }
 
 // writeJSON sets Content-Type and encodes v as JSON.
@@ -363,6 +366,83 @@ func (a *App) handleProcessLocal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, struct {
 		Dir string `json:"dir"`
 	}{Dir: dir})
+}
+
+// writeSSE marshals a ProgressEvent as an SSE data line and flushes.
+func writeSSE(w http.ResponseWriter, flusher http.Flusher, event ProgressEvent) {
+	data, _ := json.Marshal(event)
+	fmt.Fprintf(w, "data: %s\n\n", data)
+	flusher.Flush()
+}
+
+// initSSE sets SSE headers and returns the Flusher. Returns nil if not supported.
+func initSSE(w http.ResponseWriter) http.Flusher {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return nil
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	return flusher
+}
+
+// handleProcessStream is the SSE variant of handleProcess. It streams progress
+// events as the pipeline runs: fetching → parsing → generating → saving → complete.
+func (a *App) handleProcessStream(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if !decodeBody(w, r, &body) || body.URL == "" {
+		http.Error(w, "url required", http.StatusBadRequest)
+		return
+	}
+	flusher := initSSE(w)
+	if flusher == nil {
+		return
+	}
+
+	writeSSE(w, flusher, ProgressEvent{Stage: StageFetching, Message: "Fetching job description\u2026"})
+	raw, err := FetchJobDescription(r.Context(), body.URL, &a.Client, 0)
+	if err != nil {
+		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "fetch error: " + err.Error()})
+		return
+	}
+
+	dir, err := a.ProcessWithProgress(r.Context(), raw, func(e ProgressEvent) {
+		writeSSE(w, flusher, e)
+	})
+	if err != nil {
+		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "process error: " + err.Error()})
+		return
+	}
+	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Dir: dir})
+}
+
+// handleProcessLocalStream is the SSE variant of handleProcessLocal.
+// Streams progress events: parsing → generating → saving → complete.
+func (a *App) handleProcessLocalStream(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if !decodeBody(w, r, &body) || body.Content == "" {
+		http.Error(w, "content required", http.StatusBadRequest)
+		return
+	}
+	flusher := initSSE(w)
+	if flusher == nil {
+		return
+	}
+
+	dir, err := a.ProcessWithProgress(r.Context(), body.Content, func(e ProgressEvent) {
+		writeSSE(w, flusher, e)
+	})
+	if err != nil {
+		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "process error: " + err.Error()})
+		return
+	}
+	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Dir: dir})
 }
 
 // contentTypes maps file extensions to MIME types for gzip-compressed assets.
