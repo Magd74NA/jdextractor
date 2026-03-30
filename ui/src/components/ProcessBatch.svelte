@@ -29,7 +29,7 @@
 <CollapsibleCard title="Process Batch (URLs)">
   <label>
     One URL per line
-    <textarea rows={4} bind:value={urlsText} placeholder="https://...&#10;https://..."></textarea>
+    <textarea rows={4} bind:value={urlsText} placeholder={"https://...\nhttps://..."}></textarea>
   </label>
   <button onclick={submit} disabled={loading || !urlsText.trim()}>
     {loading ? 'Processing...' : 'Generate All'}

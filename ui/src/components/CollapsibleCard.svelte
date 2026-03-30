@@ -8,14 +8,14 @@
     children: Snippet;
   } = $props();
 
-  function handleToggle(e: Event) {
-    if ((e.target as HTMLDetailsElement).open && onopen) {
+  $effect(() => {
+    if (open && onopen) {
       onopen();
     }
-  }
+  });
 </script>
 
-<details bind:open ontoggle={handleToggle}>
+<details bind:open>
   <summary>{title}</summary>
   <div class="card-body">
     {@render children()}
@@ -36,24 +36,6 @@
     font-size: 1.1rem;
     padding: 0.75rem 1rem;
     color: var(--pico-color);
-    list-style: none;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  summary::after {
-    content: '›';
-    font-size: 1.3rem;
-    transition: transform 0.2s ease;
-  }
-
-  details[open] > summary::after {
-    transform: rotate(90deg);
-  }
-
-  summary::-webkit-details-marker {
-    display: none;
   }
 
   .card-body {
