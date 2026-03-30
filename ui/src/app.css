@@ -1,21 +1,31 @@
 body {
   max-width: 960px;
   margin: 0 auto;
-  padding: 1rem 16px 2rem;
+  padding: 0 16px 2rem;
 }
 
-h1 {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--pico-muted-border-color);
+/* Active nav link */
+:global(a.active) {
+  font-weight: 700;
 }
 
-/* Tighten buttons inside cards */
+/* Page header with title + action button */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.page-header h2 {
+  margin-bottom: 0;
+}
+
+/* Tighten buttons */
 button {
   width: auto;
 }
 
-/* Inline buttons beside inputs */
 .outline {
   padding: 0.4rem 0.75rem;
 }

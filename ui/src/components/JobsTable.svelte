@@ -19,10 +19,7 @@
   init();
 </script>
 
-<section class="jobs-section">
-  <h3>Applications</h3>
-
-  {#if loading}
+{#if loading}
     <p aria-busy="true">Loading applications...</p>
   {:else if error}
     <p class="error">{error}</p>
@@ -48,21 +45,9 @@
         </tbody>
       </table>
     </div>
-  {/if}
-</section>
+{/if}
 
 <style>
-  .jobs-section {
-    margin-top: 1rem;
-    border: 1px solid var(--pico-muted-border-color);
-    border-radius: var(--pico-border-radius);
-    padding: 1rem;
-  }
-
-  .jobs-section h3 {
-    margin-top: 0;
-  }
-
   .table-wrap {
     overflow-x: auto;
   }

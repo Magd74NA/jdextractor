@@ -1,6 +1,5 @@
 <script lang="ts">
   import { api } from '../lib/api';
-  import CollapsibleCard from './CollapsibleCard.svelte';
 
   let resume = $state('');
   let cover = $state('');
@@ -34,35 +33,38 @@
     setTimeout(() => coverSaved = false, 3000);
   }
 
+  load();
 </script>
 
-<CollapsibleCard title="Templates" onopen={load}>
-    {#if loading}
-      <p aria-busy="true">Loading templates...</p>
-    {:else if loaded}
-      <div class="file-section">
-        <div class="file-header">
-          <h4>Resume Template</h4>
-          <div class="file-actions">
-            {#if resumeSaved}<small class="success">Saved!</small>{/if}
-            <button class="outline" onclick={saveResume}>Save</button>
-          </div>
-        </div>
-        <textarea rows={8} bind:value={resume}></textarea>
-      </div>
+<section>
+  <h3>Templates</h3>
 
-      <div class="file-section">
-        <div class="file-header">
-          <h4>Cover Letter Template</h4>
-          <div class="file-actions">
-            {#if coverSaved}<small class="success">Saved!</small>{/if}
-            <button class="outline" onclick={saveCover}>Save</button>
-          </div>
+  {#if loading}
+    <p aria-busy="true">Loading templates...</p>
+  {:else if loaded}
+    <div class="file-section">
+      <div class="file-header">
+        <h4>Resume Template</h4>
+        <div class="file-actions">
+          {#if resumeSaved}<small class="success">Saved!</small>{/if}
+          <button class="outline" onclick={saveResume}>Save</button>
         </div>
-        <textarea rows={8} bind:value={cover}></textarea>
       </div>
-    {/if}
-  </CollapsibleCard>
+      <textarea rows={8} bind:value={resume}></textarea>
+    </div>
+
+    <div class="file-section">
+      <div class="file-header">
+        <h4>Cover Letter Template</h4>
+        <div class="file-actions">
+          {#if coverSaved}<small class="success">Saved!</small>{/if}
+          <button class="outline" onclick={saveCover}>Save</button>
+        </div>
+      </div>
+      <textarea rows={8} bind:value={cover}></textarea>
+    </div>
+  {/if}
+</section>
 
 <style>
   .file-section {

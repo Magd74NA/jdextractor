@@ -1,12 +1,25 @@
 <script lang="ts">
   import Router from "svelte-spa-router";
-  import Home from "./routes/Home.svelte";
-  import HelloWorld from "./routes/HelloWorld.svelte";
+  import Nav from "./components/Nav.svelte";
+  import Jobs from "./routes/Jobs.svelte";
+  import Process from "./routes/Process.svelte";
+  import Settings from "./routes/Settings.svelte";
+  import { loadConfig, loadPromptConfig } from "./lib/stores.svelte";
 
   const routes = {
-    "/": Home,
-    "/hello": HelloWorld,
+    "/": Jobs,
+    "/process": Process,
+    "/settings": Settings,
   };
+
+  async function init() {
+    await Promise.all([loadConfig(), loadPromptConfig()]);
+  }
+
+  init();
 </script>
 
-<Router {routes} />
+<Nav />
+<main>
+  <Router {routes} />
+</main>
