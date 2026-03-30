@@ -13,6 +13,28 @@
   let resumeSaved = $state(false);
   let coverSaved = $state(false);
 
+  let editing = $state(false);
+  let editDate = $state('');
+  let editCompany = $state('');
+  let editRole = $state('');
+
+  function startEdit() {
+    editDate = job.date;
+    editCompany = job.company;
+    editRole = job.role;
+    editing = true;
+  }
+
+  function cancelEdit() {
+    editing = false;
+  }
+
+  async function saveMeta() {
+    await api.updateJobMeta(job.dir, { company: editCompany, role: editRole, date: editDate });
+    editing = false;
+    await refreshJobs();
+  }
+
   function scoreBadgeClass(score: number): string {
     if (score >= 7) return 'badge-good';
     if (score >= 5) return 'badge-ok';
@@ -58,10 +80,10 @@
 </script>
 
 <tr>
-  <td>{job.date}</td>
-  <td>{job.company}</td>
-  <td>{job.role}</td>
-  <td><span class="badge {scoreBadgeClass(job.score)}">{job.score}</span></td>
+  <td>{#if editing}<input class="edit-input" bind:value={editDate} />{:else}{job.date}{/if}</td>
+  <td>{#if editing}<input class="edit-input" bind:value={editCompany} />{:else}{job.company}{/if}</td>
+  <td>{#if editing}<input class="edit-input" bind:value={editRole} />{:else}{job.role}{/if}</td>
+  <td class="score-cell"><span class="badge {scoreBadgeClass(job.score)}">{job.score}</span></td>
   <td>
     <select value={job.status} onchange={updateStatus}>
       {#each JOB_STATUSES as s}
@@ -71,7 +93,13 @@
   </td>
   <td class="actions-cell">
     <button class="outline btn-sm" onclick={toggle}>{expanded ? '▲' : '▼'}</button>
-    <button class="outline btn-sm danger-btn" onclick={deleteJob}>✕</button>
+    {#if editing}
+      <button class="outline btn-sm save-btn" onclick={saveMeta} title="Save">💾</button>
+      <button class="outline btn-sm" onclick={cancelEdit} title="Cancel">✕</button>
+    {:else}
+      <button class="outline btn-sm" onclick={startEdit} title="Edit">✏</button>
+      <button class="outline btn-sm danger-btn" onclick={deleteJob} title="Delete">✕</button>
+    {/if}
   </td>
 </tr>
 
@@ -135,10 +163,11 @@
 
   .actions-cell {
     white-space: nowrap;
+    overflow: visible;
   }
 
   .btn-sm {
-    padding: 0.25rem 0.5rem;
+    padding: 0.25em 0.45em;
     margin-bottom: 0;
   }
 
@@ -188,8 +217,33 @@
     color: var(--pico-ins-color);
   }
 
+  .score-cell {
+    text-align: center;
+    overflow: visible;
+  }
+
   select {
     margin-bottom: 0;
-    padding: 0.25rem 0.5rem;
+    padding: 0.2em 0.4em;
+    width: 100%;
+    font-size: inherit;
+  }
+
+  td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .edit-input {
+    width: 100%;
+    padding: 0.2rem 0.4rem;
+    margin-bottom: 0;
+    font-size: 0.875rem;
+  }
+
+  .save-btn {
+    color: var(--pico-ins-color);
+    border-color: var(--pico-ins-color);
   }
 </style>

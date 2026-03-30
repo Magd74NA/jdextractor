@@ -30,12 +30,12 @@
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Company</th>
-            <th>Role</th>
-            <th>Score</th>
-            <th>Status</th>
-            <th>Actions</th>
+            <th class="col-date">Date</th>
+            <th class="col-company">Company</th>
+            <th class="col-role">Role</th>
+            <th class="col-score">Score</th>
+            <th class="col-status">Status</th>
+            <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -49,7 +49,42 @@
 
 <style>
   .table-wrap {
-    overflow-x: auto;
+    overflow-x: clip;
+  }
+
+  table {
+    table-layout: fixed;
+    width: 100%;
+    font-size: 0.72rem;
+  }
+
+  thead th {
+    white-space: nowrap;
+  }
+
+  .col-date {
+    width: 8em;
+  }
+
+  .col-company {
+    width: 19%;
+  }
+
+  .col-role {
+    width: 26%;
+  }
+
+  .col-score {
+    width: 3.5em;
+    text-align: center;
+  }
+
+  .col-status {
+    width: 12em;
+  }
+
+  .col-actions {
+    width: 9.5em;
   }
 
   .error {

@@ -29,6 +29,8 @@ export const api = {
   saveTemplates: (data: Partial<Templates>) => request<null>('PATCH', '/templates', data),
   getJobs: () => request<Job[]>('GET', '/jobs'),
   updateJobStatus: (id: string, status: string) => request<null>('PATCH', `/jobs/${id}`, { status }),
+  updateJobMeta: (id: string, data: { company?: string; role?: string; date?: string }) =>
+    request<null>('PATCH', `/jobs/${id}`, data),
   deleteJob: (id: string) => request<null>('DELETE', `/jobs/${id}`),
   getJobFiles: (id: string) => request<JobFiles>('GET', `/jobs/${id}/files`),
   saveJobFiles: (id: string, data: Partial<JobFiles>) => request<null>('PATCH', `/jobs/${id}/files`, data),

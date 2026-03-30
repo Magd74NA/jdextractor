@@ -269,18 +269,30 @@ func (a *App) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out)
 }
 
-// handleUpdateJobStatus decodes {"status":"..."} and updates the job's meta.json.
+// handleUpdateJobStatus decodes a partial job update and applies it to meta.json.
+// Accepts any combination of status, company, role, and date fields.
 func (a *App) handleUpdateJobStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {
-		Status string `json:"status"`
+		Status  *string `json:"status"`
+		Company *string `json:"company"`
+		Role    *string `json:"role"`
+		Date    *string `json:"date"`
 	}
 	if !decodeBody(w, r, &body) {
 		return
 	}
-	if err := UpdateJobStatus(a, id, body.Status); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	if body.Status != nil {
+		if err := UpdateJobStatus(a, id, *body.Status); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if body.Company != nil || body.Role != nil || body.Date != nil {
+		if err := UpdateJobMeta(a, id, body.Company, body.Role, body.Date); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
