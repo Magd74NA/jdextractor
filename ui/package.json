@@ -20,7 +20,7 @@
     "vite-plugin-compression2": "^2.5.3"
   },
   "dependencies": {
-    "svelte-spa-router": "^5.0.0",
-    "water.css": "^2.1.1"
+    "@picocss/pico": "^2.1.1",
+    "svelte-spa-router": "^5.0.0"
   }
 }
