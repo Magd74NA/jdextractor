@@ -27,7 +27,7 @@ vet: fmt
 	go vet ./...
 
 build: ui-build vet
-	go build -o out/jdextractor ./cmd
+	go build -trimpath -ldflags="-s -w -X main.version=$$(git describe --tags --always --dirty 2>/dev/null || echo dev)" -o out/jdextractor ./cmd
 
 run: build
 	./out/jdextractor
