@@ -2,11 +2,7 @@ package jdextract
 
 import (
 	"crypto/rand"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	st "strings"
 	"text/tabwriter"
@@ -29,7 +25,7 @@ type ContactMeta struct {
 	Notes         string         `json:"notes,omitempty"`
 	Conversations []Conversation `json:"conversations"`
 	Created       string         `json:"created"` // YYYY-MM-DD
-	Dir           string         `json:"-"`       // populated at read time, excluded from JSON
+	Dir           string         `json:"-"`        // populated at read time, excluded from JSON
 }
 
 // Message is a single message within a conversation thread.
@@ -63,6 +59,9 @@ type ContactUpdate struct {
 	Notes        *string   `json:"notes"`
 }
 
+func (m *ContactMeta) SetDir(d string) { m.Dir = d }
+func (m ContactMeta) GetDir() string   { return m.Dir }
+
 var validContactStatuses = []string{
 	"new", "reached-out", "replied", "meeting-scheduled", "connected", "dormant",
 }
@@ -79,44 +78,19 @@ func contactSlugify(name string) string {
 	return prefix + "-" + midfix + "-" + slug
 }
 
-func createContactDirectory(slug string, a *App) (string, error) {
-	dirName := filepath.Join(a.Paths.Contacts, slug)
-	err := os.Mkdir(dirName, 0755)
+// mutateContact reads a contact's meta, applies fn, and writes it back.
+func mutateContact(s *Store[ContactMeta], id string, fn func(*ContactMeta) error) error {
+	if !ValidID(id) {
+		return fmt.Errorf("invalid contact id %q", id)
+	}
+	m, err := s.ReadMeta(id)
 	if err != nil {
-		if errors.Is(err, os.ErrExist) {
-			dirName = dirName + "col"
-			err = os.Mkdir(dirName, 0755)
-			if err != nil {
-				return "", err
-			}
-			return dirName, nil
-		}
-		return "", err
+		return fmt.Errorf("read meta.json: %w", err)
 	}
-	return dirName, nil
-}
-
-func readContactMeta(path string) (*ContactMeta, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var m ContactMeta
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, err
-	}
-	if m.Conversations == nil {
-		m.Conversations = []Conversation{}
-	}
-	return &m, nil
-}
-
-func writeContactMeta(path string, m *ContactMeta) error {
-	data, err := json.MarshalIndent(m, "", "\t")
-	if err != nil {
+	if err := fn(m); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return s.WriteMeta(id, m)
 }
 
 // CreateContact creates a new contact directory and writes meta.json. Returns the directory name.
@@ -133,41 +107,24 @@ func CreateContact(a *App, meta ContactMeta) (string, error) {
 	}
 
 	slug := contactSlugify(meta.Name)
-	dir, err := createContactDirectory(slug, a)
+	dir, err := a.Contacts.MkDir(slug)
 	if err != nil {
 		return "", fmt.Errorf("create contact directory: %w", err)
 	}
 
-	metaPath := filepath.Join(dir, "meta.json")
-	if err := writeContactMeta(metaPath, &meta); err != nil {
+	if err := a.Contacts.WriteMeta(dir, &meta); err != nil {
 		return "", fmt.Errorf("write meta.json: %w", err)
 	}
 
-	return filepath.Base(dir), nil
+	return dir, nil
 }
 
 // ListContacts reads all contact directories and returns contacts sorted by created date descending.
 func ListContacts(a *App) ([]ContactMeta, error) {
-	entries, err := os.ReadDir(a.Paths.Contacts)
+	contacts, err := a.Contacts.List()
 	if err != nil {
-		return nil, fmt.Errorf("read contacts directory: %w", err)
+		return nil, err
 	}
-
-	var contacts []ContactMeta
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		metaPath := filepath.Join(a.Paths.Contacts, e.Name(), "meta.json")
-		m, err := readContactMeta(metaPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", e.Name(), err)
-			continue
-		}
-		m.Dir = e.Name()
-		contacts = append(contacts, *m)
-	}
-
 	sort.Slice(contacts, func(i, j int) bool {
 		return contacts[i].Created > contacts[j].Created
 	})
@@ -176,26 +133,11 @@ func ListContacts(a *App) ([]ContactMeta, error) {
 
 // GetContact reads a single contact by its exact directory name.
 func GetContact(a *App, dir string) (*ContactMeta, error) {
-	if !validContactID(dir) {
-		return nil, fmt.Errorf("invalid contact id %q", dir)
-	}
-	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
-	m, err := readContactMeta(metaPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("contact not found: %q", dir)
-		}
-		return nil, fmt.Errorf("read meta.json: %w", err)
-	}
-	m.Dir = dir
-	return m, nil
+	return a.Contacts.Get(dir)
 }
 
 // UpdateContact applies partial updates to a contact's meta.json.
 func UpdateContact(a *App, id string, updates ContactUpdate) error {
-	if !validContactID(id) {
-		return fmt.Errorf("invalid contact id %q", id)
-	}
 	if updates.Status != nil {
 		found := false
 		for _, s := range validContactStatuses {
@@ -209,69 +151,54 @@ func UpdateContact(a *App, id string, updates ContactUpdate) error {
 		}
 	}
 
-	metaPath := filepath.Join(a.Paths.Contacts, id, "meta.json")
-	m, err := readContactMeta(metaPath)
-	if err != nil {
-		return fmt.Errorf("read meta.json: %w", err)
-	}
-
-	if updates.Name != nil {
-		m.Name = *updates.Name
-	}
-	if updates.Company != nil {
-		m.Company = *updates.Company
-	}
-	if updates.Role != nil {
-		m.Role = *updates.Role
-	}
-	if updates.Email != nil {
-		m.Email = *updates.Email
-	}
-	if updates.Phone != nil {
-		m.Phone = *updates.Phone
-	}
-	if updates.LinkedIn != nil {
-		m.LinkedIn = *updates.LinkedIn
-	}
-	if updates.Source != nil {
-		m.Source = *updates.Source
-	}
-	if updates.Status != nil {
-		m.Status = *updates.Status
-	}
-	if updates.FollowUpDate != nil {
-		m.FollowUpDate = *updates.FollowUpDate
-	}
-	if updates.LinkedJobs != nil {
-		m.LinkedJobs = *updates.LinkedJobs
-	}
-	if updates.Tags != nil {
-		m.Tags = *updates.Tags
-	}
-	if updates.Notes != nil {
-		m.Notes = *updates.Notes
-	}
-
-	return writeContactMeta(metaPath, m)
+	return mutateContact(&a.Contacts, id, func(m *ContactMeta) error {
+		if updates.Name != nil {
+			m.Name = *updates.Name
+		}
+		if updates.Company != nil {
+			m.Company = *updates.Company
+		}
+		if updates.Role != nil {
+			m.Role = *updates.Role
+		}
+		if updates.Email != nil {
+			m.Email = *updates.Email
+		}
+		if updates.Phone != nil {
+			m.Phone = *updates.Phone
+		}
+		if updates.LinkedIn != nil {
+			m.LinkedIn = *updates.LinkedIn
+		}
+		if updates.Source != nil {
+			m.Source = *updates.Source
+		}
+		if updates.Status != nil {
+			m.Status = *updates.Status
+		}
+		if updates.FollowUpDate != nil {
+			m.FollowUpDate = *updates.FollowUpDate
+		}
+		if updates.LinkedJobs != nil {
+			m.LinkedJobs = *updates.LinkedJobs
+		}
+		if updates.Tags != nil {
+			m.Tags = *updates.Tags
+		}
+		if updates.Notes != nil {
+			m.Notes = *updates.Notes
+		}
+		return nil
+	})
 }
 
 // DeleteContact removes a contact directory and all its contents.
 func DeleteContact(a *App, dir string) error {
-	if !validContactID(dir) {
-		return fmt.Errorf("invalid contact id %q", dir)
-	}
-	path := filepath.Join(a.Paths.Contacts, dir)
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("contact not found: %q", dir)
-	}
-	return os.RemoveAll(path)
+	return a.Contacts.Delete(dir)
 }
 
 // AddConversation appends a conversation thread to a contact's meta.json.
 func AddConversation(a *App, dir string, conv Conversation) error {
-	if !validContactID(dir) {
-		return fmt.Errorf("invalid contact id %q", dir)
-	}
 	if conv.Summary == "" {
 		return fmt.Errorf("conversation summary is required")
 	}
@@ -281,21 +208,14 @@ func AddConversation(a *App, dir string, conv Conversation) error {
 	if conv.Messages == nil {
 		conv.Messages = []Message{}
 	}
-
-	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
-	m, err := readContactMeta(metaPath)
-	if err != nil {
-		return fmt.Errorf("read meta.json: %w", err)
-	}
-	m.Conversations = append(m.Conversations, conv)
-	return writeContactMeta(metaPath, m)
+	return mutateContact(&a.Contacts, dir, func(m *ContactMeta) error {
+		m.Conversations = append(m.Conversations, conv)
+		return nil
+	})
 }
 
 // AddMessage appends a message to an existing conversation thread.
 func AddMessage(a *App, dir string, convIndex int, msg Message) error {
-	if !validContactID(dir) {
-		return fmt.Errorf("invalid contact id %q", dir)
-	}
 	if msg.Content == "" {
 		return fmt.Errorf("message content is required")
 	}
@@ -305,72 +225,50 @@ func AddMessage(a *App, dir string, convIndex int, msg Message) error {
 	if msg.Date == "" {
 		msg.Date = currentDate()
 	}
-
-	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
-	m, err := readContactMeta(metaPath)
-	if err != nil {
-		return fmt.Errorf("read meta.json: %w", err)
-	}
-	if convIndex < 0 || convIndex >= len(m.Conversations) {
-		return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
-	}
-	m.Conversations[convIndex].Messages = append(m.Conversations[convIndex].Messages, msg)
-	return writeContactMeta(metaPath, m)
+	return mutateContact(&a.Contacts, dir, func(m *ContactMeta) error {
+		if convIndex < 0 || convIndex >= len(m.Conversations) {
+			return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
+		}
+		m.Conversations[convIndex].Messages = append(m.Conversations[convIndex].Messages, msg)
+		return nil
+	})
 }
 
 // DeleteMessage removes a message by index from a conversation thread.
 func DeleteMessage(a *App, dir string, convIndex, msgIndex int) error {
-	if !validContactID(dir) {
-		return fmt.Errorf("invalid contact id %q", dir)
-	}
-	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
-	m, err := readContactMeta(metaPath)
-	if err != nil {
-		return fmt.Errorf("read meta.json: %w", err)
-	}
-	if convIndex < 0 || convIndex >= len(m.Conversations) {
-		return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
-	}
-	msgs := m.Conversations[convIndex].Messages
-	if msgIndex < 0 || msgIndex >= len(msgs) {
-		return fmt.Errorf("message index %d out of range (0-%d)", msgIndex, len(msgs)-1)
-	}
-	m.Conversations[convIndex].Messages = append(msgs[:msgIndex], msgs[msgIndex+1:]...)
-	return writeContactMeta(metaPath, m)
+	return mutateContact(&a.Contacts, dir, func(m *ContactMeta) error {
+		if convIndex < 0 || convIndex >= len(m.Conversations) {
+			return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
+		}
+		msgs := m.Conversations[convIndex].Messages
+		if msgIndex < 0 || msgIndex >= len(msgs) {
+			return fmt.Errorf("message index %d out of range (0-%d)", msgIndex, len(msgs)-1)
+		}
+		m.Conversations[convIndex].Messages = append(msgs[:msgIndex], msgs[msgIndex+1:]...)
+		return nil
+	})
 }
 
 // UpdateConversationSummary updates the summary of a conversation thread.
 func UpdateConversationSummary(a *App, dir string, convIndex int, summary string) error {
-	if !validContactID(dir) {
-		return fmt.Errorf("invalid contact id %q", dir)
-	}
-	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
-	m, err := readContactMeta(metaPath)
-	if err != nil {
-		return fmt.Errorf("read meta.json: %w", err)
-	}
-	if convIndex < 0 || convIndex >= len(m.Conversations) {
-		return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
-	}
-	m.Conversations[convIndex].Summary = summary
-	return writeContactMeta(metaPath, m)
+	return mutateContact(&a.Contacts, dir, func(m *ContactMeta) error {
+		if convIndex < 0 || convIndex >= len(m.Conversations) {
+			return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
+		}
+		m.Conversations[convIndex].Summary = summary
+		return nil
+	})
 }
 
 // DeleteConversation removes a conversation entry by index from a contact's meta.json.
 func DeleteConversation(a *App, dir string, index int) error {
-	if !validContactID(dir) {
-		return fmt.Errorf("invalid contact id %q", dir)
-	}
-	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
-	m, err := readContactMeta(metaPath)
-	if err != nil {
-		return fmt.Errorf("read meta.json: %w", err)
-	}
-	if index < 0 || index >= len(m.Conversations) {
-		return fmt.Errorf("conversation index %d out of range (0-%d)", index, len(m.Conversations)-1)
-	}
-	m.Conversations = append(m.Conversations[:index], m.Conversations[index+1:]...)
-	return writeContactMeta(metaPath, m)
+	return mutateContact(&a.Contacts, dir, func(m *ContactMeta) error {
+		if index < 0 || index >= len(m.Conversations) {
+			return fmt.Errorf("conversation index %d out of range (0-%d)", index, len(m.Conversations)-1)
+		}
+		m.Conversations = append(m.Conversations[:index], m.Conversations[index+1:]...)
+		return nil
+	})
 }
 
 // ListOverdueFollowups returns contacts whose follow_up_date is today or earlier.
@@ -423,30 +321,8 @@ func FormatContacts(contacts []ContactMeta) string {
 	return buf.String()
 }
 
-// validContactID rejects contact IDs that could escape the contacts directory.
-func validContactID(id string) bool {
-	return id != "" && id != "." && !st.Contains(id, "/") && !st.Contains(id, "\\")
-}
-
 // FindContactByPrefix finds a contact directory by prefix, returning an error if
 // there are zero or multiple matches.
 func FindContactByPrefix(a *App, prefix string) (string, error) {
-	entries, err := os.ReadDir(a.Paths.Contacts)
-	if err != nil {
-		return "", fmt.Errorf("read contacts directory: %w", err)
-	}
-	var matches []string
-	for _, e := range entries {
-		if e.IsDir() && st.HasPrefix(e.Name(), prefix) {
-			matches = append(matches, e.Name())
-		}
-	}
-	switch len(matches) {
-	case 0:
-		return "", fmt.Errorf("no contact directory matches prefix %q", prefix)
-	case 1:
-		return matches[0], nil
-	default:
-		return "", fmt.Errorf("prefix %q is ambiguous: matches %s", prefix, st.Join(matches, ", "))
-	}
+	return a.Contacts.FindByPrefix(prefix)
 }

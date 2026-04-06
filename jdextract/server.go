@@ -25,10 +25,8 @@ func (a *App) Serve(ctx context.Context, port string) error {
 		if _, err := os.Stat(promptConfigPath); os.IsNotExist(err) {
 			_ = CreateEmptyPromptConfig(promptConfigPath)
 		}
-		if f, err := os.Open(promptConfigPath); err == nil {
-			if cfg, err := LoadPromptConfig(f); err == nil {
-				a.PromptConfig = *cfg
-			}
+		if cfg, err := LoadJSON[PromptConfig](promptConfigPath); err == nil {
+			a.PromptConfig = *cfg
 		}
 	}
 
@@ -38,10 +36,8 @@ func (a *App) Serve(ctx context.Context, port string) error {
 		if _, err := os.Stat(networkingPromptPath); os.IsNotExist(err) {
 			_ = CreateEmptyNetworkingPromptConfig(networkingPromptPath)
 		}
-		if f, err := os.Open(networkingPromptPath); err == nil {
-			if cfg, err := LoadNetworkingPromptConfig(f); err == nil {
-				a.NetworkingPromptConfig = *cfg
-			}
+		if cfg, err := LoadJSON[NetworkingPromptConfig](networkingPromptPath); err == nil {
+			a.NetworkingPromptConfig = *cfg
 		}
 	}
 

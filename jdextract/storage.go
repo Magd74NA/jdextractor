@@ -2,8 +2,6 @@ package jdextract
 
 import (
 	"crypto/rand"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +23,9 @@ type ApplicationMeta struct {
 	Status  string `json:"status,omitempty"`
 	Dir     string `json:"-"`
 }
+
+func (m *ApplicationMeta) SetDir(d string) { m.Dir = d }
+func (m ApplicationMeta) GetDir() string   { return m.Dir }
 
 var validStatuses = []string{"draft", "applied", "interviewing", "offer", "rejected"}
 
@@ -60,22 +61,6 @@ func slugify(nodes []JobDescriptionNode) string {
 	return prefix + "-" + midfix + "-" + slug
 }
 
-func createApplicationDirectory(slug string, a *App) error {
-	dirName := filepath.Join(a.Paths.Jobs, slug)
-	err := os.Mkdir(dirName, 0755)
-	if err != nil {
-		if errors.Is(err, os.ErrExist) {
-			dirName = dirName + "col"
-			err = os.Mkdir(dirName, 0755)
-			if err != nil {
-				return err
-			}
-		}
-		return err
-	}
-	return nil
-}
-
 func fetchCover(a *App) (string, error) {
 	path := filepath.Join(a.Paths.Templates, "cover.txt")
 	content, err := os.ReadFile(path)
@@ -97,31 +82,10 @@ func fetchResume(a *App) (string, error) {
 // ListJobs reads all job directories, parses meta.json, and returns sorted results.
 // Corrupt or missing meta.json entries are skipped with a warning to stderr.
 func ListJobs(a *App) ([]ApplicationMeta, error) {
-	entries, err := os.ReadDir(a.Paths.Jobs)
+	jobs, err := a.Jobs.List()
 	if err != nil {
-		return nil, fmt.Errorf("read jobs directory: %w", err)
+		return nil, err
 	}
-
-	var jobs []ApplicationMeta
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		metaPath := filepath.Join(a.Paths.Jobs, e.Name(), "meta.json")
-		data, err := os.ReadFile(metaPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", e.Name(), err)
-			continue
-		}
-		var m ApplicationMeta
-		if err := json.Unmarshal(data, &m); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: corrupt meta.json in %s: %v\n", e.Name(), err)
-			continue
-		}
-		m.Dir = e.Name()
-		jobs = append(jobs, m)
-	}
-
 	sort.Slice(jobs, func(i, j int) bool {
 		return jobs[i].Date > jobs[j].Date
 	})
@@ -146,30 +110,18 @@ func FormatJobs(jobs []ApplicationMeta) string {
 
 // DeleteJob removes a job directory and all its contents by exact directory name.
 func DeleteJob(a *App, dir string) error {
-	if dir == "" || dir == "." || st.Contains(dir, "/") || st.Contains(dir, "\\") {
-		return fmt.Errorf("invalid job id %q", dir)
-	}
-	path := filepath.Join(a.Paths.Jobs, dir)
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("job not found: %q", dir)
-	}
-	return os.RemoveAll(path)
+	return a.Jobs.Delete(dir)
 }
 
 // UpdateJobMeta updates editable metadata fields (company, role, date) for a job.
 // id must be the exact directory name.
 func UpdateJobMeta(a *App, id string, company, role, date *string) error {
-	if id == "" || id == "." || st.Contains(id, "/") || st.Contains(id, "\\") {
+	if !ValidID(id) {
 		return fmt.Errorf("invalid job id %q", id)
 	}
-	metaPath := filepath.Join(a.Paths.Jobs, id, "meta.json")
-	data, err := os.ReadFile(metaPath)
+	m, err := a.Jobs.ReadMeta(id)
 	if err != nil {
 		return fmt.Errorf("read meta.json: %w", err)
-	}
-	var m ApplicationMeta
-	if err := json.Unmarshal(data, &m); err != nil {
-		return fmt.Errorf("parse meta.json: %w", err)
 	}
 	if company != nil {
 		m.Company = *company
@@ -180,34 +132,13 @@ func UpdateJobMeta(a *App, id string, company, role, date *string) error {
 	if date != nil {
 		m.Date = *date
 	}
-	out, err := json.Marshal(m)
-	if err != nil {
-		return fmt.Errorf("marshal meta: %w", err)
-	}
-	return os.WriteFile(metaPath, out, 0644)
+	return a.Jobs.WriteMeta(id, m)
 }
 
 // FindJobByPrefix finds a job directory by prefix, returning an error if there are
 // zero or multiple matches.
 func FindJobByPrefix(a *App, prefix string) (string, error) {
-	entries, err := os.ReadDir(a.Paths.Jobs)
-	if err != nil {
-		return "", fmt.Errorf("read jobs directory: %w", err)
-	}
-	var matches []string
-	for _, e := range entries {
-		if e.IsDir() && st.HasPrefix(e.Name(), prefix) {
-			matches = append(matches, e.Name())
-		}
-	}
-	switch len(matches) {
-	case 0:
-		return "", fmt.Errorf("no job directory matches prefix %q", prefix)
-	case 1:
-		return matches[0], nil
-	default:
-		return "", fmt.Errorf("prefix %q is ambiguous: matches %s", prefix, st.Join(matches, ", "))
-	}
+	return a.Jobs.FindByPrefix(prefix)
 }
 
 // UpdateJobStatus finds a job by directory prefix and updates its status in meta.json.
@@ -215,45 +146,18 @@ func UpdateJobStatus(a *App, prefix, status string) error {
 	if !slices.Contains(validStatuses, status) {
 		return fmt.Errorf("invalid status %q: must be one of %s", status, st.Join(validStatuses, ", "))
 	}
-
-	entries, err := os.ReadDir(a.Paths.Jobs)
+	dir, err := a.Jobs.FindByPrefix(prefix)
 	if err != nil {
-		return fmt.Errorf("read jobs directory: %w", err)
+		return err
 	}
-
-	var matches []string
-	for _, e := range entries {
-		if e.IsDir() && st.HasPrefix(e.Name(), prefix) {
-			matches = append(matches, e.Name())
-		}
-	}
-
-	switch len(matches) {
-	case 0:
-		return fmt.Errorf("no job directory matches prefix %q", prefix)
-	case 1:
-		// ok
-	default:
-		return fmt.Errorf("prefix %q is ambiguous: matches %s", prefix, st.Join(matches, ", "))
-	}
-
-	metaPath := filepath.Join(a.Paths.Jobs, matches[0], "meta.json")
-	data, err := os.ReadFile(metaPath)
+	m, err := a.Jobs.ReadMeta(dir)
 	if err != nil {
 		return fmt.Errorf("read meta.json: %w", err)
 	}
-	var m ApplicationMeta
-	if err := json.Unmarshal(data, &m); err != nil {
-		return fmt.Errorf("parse meta.json: %w", err)
-	}
 	m.Status = status
-	out, err := json.Marshal(m)
-	if err != nil {
-		return fmt.Errorf("marshal meta: %w", err)
-	}
-	if err := os.WriteFile(metaPath, out, 0644); err != nil {
+	if err := a.Jobs.WriteMeta(dir, m); err != nil {
 		return fmt.Errorf("write meta.json: %w", err)
 	}
-	fmt.Printf("Updated %s → %s\n", matches[0], status)
+	fmt.Printf("Updated %s → %s\n", dir, status)
 	return nil
 }

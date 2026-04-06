@@ -241,16 +241,9 @@ func (a *App) handleSummarizeConversation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	invoker := LLMInvoker(InvokeDeepseekApi)
-	apiKey := a.Config.DeepSeekApiKey
-	model := a.Config.DeepSeekModel
-	if a.Config.Backend == "kimi" {
-		invoker = InvokeKimiApi
-		apiKey = a.Config.KimiApiKey
-		model = a.Config.KimiModel
-	}
+	b := a.Backend()
 
-	summary, err := SummarizeConversation(r.Context(), invoker, apiKey, model, &a.Client, conv)
+	summary, err := SummarizeConversation(r.Context(), b.Invoker, b.APIKey, b.Model, &a.Client, conv)
 	if err != nil {
 		http.Error(w, "summarize: "+err.Error(), http.StatusBadGateway)
 		return
@@ -275,17 +268,9 @@ func (a *App) handleGenerateFollowup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	invoker := LLMInvoker(InvokeDeepseekApi)
-	var streamInvoker StreamingLLMInvoker
-	apiKey := a.Config.DeepSeekApiKey
-	model := a.Config.DeepSeekModel
-	if a.Config.Backend == "kimi" {
-		invoker = InvokeKimiApi
-		apiKey = a.Config.KimiApiKey
-		model = a.Config.KimiModel
-	}
+	b := a.Backend()
 
-	result, err := GenerateFollowup(r.Context(), invoker, streamInvoker, apiKey, model, &a.Client, *contact, a.NetworkingPromptConfig, nil)
+	result, err := GenerateFollowup(r.Context(), b.Invoker, nil, b.APIKey, b.Model, &a.Client, *contact, a.NetworkingPromptConfig, nil)
 	if err != nil {
 		http.Error(w, "generate followup: "+err.Error(), http.StatusBadGateway)
 		return
@@ -311,16 +296,7 @@ func (a *App) handleGenerateFollowupStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	invoker := LLMInvoker(InvokeDeepseekApi)
-	streamInvoker := StreamingLLMInvoker(InvokeDeepseekApiStream)
-	apiKey := a.Config.DeepSeekApiKey
-	model := a.Config.DeepSeekModel
-	if a.Config.Backend == "kimi" {
-		invoker = InvokeKimiApi
-		streamInvoker = InvokeKimiApiStream
-		apiKey = a.Config.KimiApiKey
-		model = a.Config.KimiModel
-	}
+	b := a.Backend()
 
 	writeSSE(w, flusher, ProgressEvent{Stage: StageGenerating, Message: "Generating follow-up message\u2026"})
 
@@ -328,7 +304,7 @@ func (a *App) handleGenerateFollowupStream(w http.ResponseWriter, r *http.Reques
 		writeSSE(w, flusher, ProgressEvent{Stage: StageContent, Delta: delta})
 	}
 
-	result, err := GenerateFollowup(r.Context(), invoker, streamInvoker, apiKey, model, &a.Client, *contact, a.NetworkingPromptConfig, onDelta)
+	result, err := GenerateFollowup(r.Context(), b.Invoker, b.StreamInvoker, b.APIKey, b.Model, &a.Client, *contact, a.NetworkingPromptConfig, onDelta)
 	if err != nil {
 		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "generate followup: " + err.Error()})
 		return
@@ -394,7 +370,7 @@ func (a *App) handleUpdateNetworkingPromptConfig(w http.ResponseWriter, r *http.
 		a.NetworkingPromptConfig.TaskList = *body.TaskList
 	}
 	path := filepath.Join(a.Paths.Config, "networking_prompt.json")
-	if err := SaveNetworkingPromptConfig(path, a.NetworkingPromptConfig); err != nil {
+	if err := SaveJSON(path, a.NetworkingPromptConfig, 0600); err != nil {
 		http.Error(w, "save networking prompt config: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

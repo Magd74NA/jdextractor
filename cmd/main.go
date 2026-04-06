@@ -127,7 +127,7 @@ func initAppWithConfig() *jdextract.App {
 	app := initApp()
 	configPath := filepath.Join(app.Paths.Config, "config.json")
 	promptConfigPath := filepath.Join(app.Paths.Config, "prompt.json")
-	conf, err := os.Open(configPath)
+	config, err := jdextract.LoadJSON[jdextract.Config](configPath)
 	if err != nil {
 		err = jdextract.CreateEmptyConfig(configPath)
 		err = jdextract.CreateEmptyPromptConfig(promptConfigPath)
@@ -138,20 +138,9 @@ func initAppWithConfig() *jdextract.App {
 		fmt.Printf("Created config at %s — fill in your API key and re-run.\n", configPath)
 		os.Exit(0)
 	}
-	config, err := jdextract.LoadConfig(conf)
-	conf.Close()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "config load error: %s\n", err)
-		os.Exit(1)
-	}
 	app.Config = *config
 
-	if pconf, err := os.Open(promptConfigPath); err == nil {
-		promptConfig, err := jdextract.LoadPromptConfig(pconf)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "prompt config load error: %s\n", err)
-			os.Exit(1)
-		}
+	if promptConfig, err := jdextract.LoadJSON[jdextract.PromptConfig](promptConfigPath); err == nil {
 		app.PromptConfig = *promptConfig
 	}
 
@@ -297,20 +286,10 @@ func initAppForServe() *jdextract.App {
 	app := initApp()
 	configPath := filepath.Join(app.Paths.Config, "config.json")
 	promptConfigPath := filepath.Join(app.Paths.Config, "prompt.json")
-	if conf, err := os.Open(configPath); err == nil {
-		config, err := jdextract.LoadConfig(conf)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "config load error: %s\n", err)
-			os.Exit(1)
-		}
+	if config, err := jdextract.LoadJSON[jdextract.Config](configPath); err == nil {
 		app.Config = *config
 	}
-	if pconf, err := os.Open(promptConfigPath); err == nil {
-		promptConfig, err := jdextract.LoadPromptConfig(pconf)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "prompt config load error: %s\n", err)
-			os.Exit(1)
-		}
+	if promptConfig, err := jdextract.LoadJSON[jdextract.PromptConfig](promptConfigPath); err == nil {
 		app.PromptConfig = *promptConfig
 	}
 	if client, err := jdextract.InitiateClient(); err == nil {
@@ -516,10 +495,8 @@ func cmdContactsFollowup(args []string) {
 	// Load networking prompt config (same pattern as server.go).
 	npPath := filepath.Join(app.Paths.Config, "networking_prompt.json")
 	if app.NetworkingPromptConfig.SystemPrompt == "" && app.NetworkingPromptConfig.TaskList == "" {
-		if f, err := os.Open(npPath); err == nil {
-			if cfg, err := jdextract.LoadNetworkingPromptConfig(f); err == nil {
-				app.NetworkingPromptConfig = *cfg
-			}
+		if cfg, err := jdextract.LoadJSON[jdextract.NetworkingPromptConfig](npPath); err == nil {
+			app.NetworkingPromptConfig = *cfg
 		}
 	}
 	dir, err := jdextract.FindContactByPrefix(app, args[0])
@@ -533,24 +510,15 @@ func cmdContactsFollowup(args []string) {
 		os.Exit(1)
 	}
 
-	invoker := jdextract.LLMInvoker(jdextract.InvokeDeepseekApi)
-	streamInvoker := jdextract.StreamingLLMInvoker(jdextract.InvokeDeepseekApiStream)
-	apiKey := app.Config.DeepSeekApiKey
-	model := app.Config.DeepSeekModel
-	if app.Config.Backend == "kimi" {
-		invoker = jdextract.InvokeKimiApi
-		streamInvoker = jdextract.InvokeKimiApiStream
-		apiKey = app.Config.KimiApiKey
-		model = app.Config.KimiModel
-	}
+	b := app.Backend()
 
 	fmt.Fprintln(os.Stderr, "Generating follow-up message…")
 	result, err := jdextract.GenerateFollowup(
 		context.Background(),
-		invoker,
-		streamInvoker,
-		apiKey,
-		model,
+		b.Invoker,
+		b.StreamInvoker,
+		b.APIKey,
+		b.Model,
 		&app.Client,
 		*contact,
 		app.NetworkingPromptConfig,

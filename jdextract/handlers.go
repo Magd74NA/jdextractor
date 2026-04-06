@@ -74,9 +74,9 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
-// validID rejects job IDs that could escape the jobs directory.
+// validID is an alias kept for local readability; delegates to ValidID in store.go.
 func validID(id string) bool {
-	return id != "" && id != "." && !strings.Contains(id, "/") && !strings.Contains(id, "\\")
+	return ValidID(id)
 }
 
 var (
@@ -242,7 +242,7 @@ func (a *App) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		a.Config.Port = *body.Port
 	}
 	path := filepath.Join(a.Paths.Config, "config.json")
-	if err := SaveConfig(path, a.Config); err != nil {
+	if err := SaveJSON(path, a.Config, 0600); err != nil {
 		http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -266,7 +266,7 @@ func (a *App) handleUpdatePromptConfig(w http.ResponseWriter, r *http.Request) {
 		a.PromptConfig.SystemPrompt = *body.SystemPrompt
 	}
 	path := filepath.Join(a.Paths.Config, "prompt.json")
-	if err := SavePromptConfig(path, a.PromptConfig); err != nil {
+	if err := SaveJSON(path, a.PromptConfig, 0600); err != nil {
 		http.Error(w, "failed to save prompt config: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

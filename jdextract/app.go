@@ -28,6 +28,36 @@ type App struct {
 	PromptConfig           PromptConfig
 	NetworkingPromptConfig NetworkingPromptConfig
 	Client                 http.Client
+	Jobs                   Store[ApplicationMeta]
+	Contacts               Store[ContactMeta]
+}
+
+// LLMBackend holds the resolved invoker functions and credentials for the
+// configured LLM backend.
+type LLMBackend struct {
+	Invoker       LLMInvoker
+	StreamInvoker StreamingLLMInvoker
+	APIKey        string
+	Model         string
+}
+
+// Backend returns the LLM invoker functions and credentials for the currently
+// configured backend (deepseek or kimi).
+func (a *App) Backend() LLMBackend {
+	if a.Config.Backend == "kimi" {
+		return LLMBackend{
+			Invoker:       InvokeKimiApi,
+			StreamInvoker: InvokeKimiApiStream,
+			APIKey:        a.Config.KimiApiKey,
+			Model:         a.Config.KimiModel,
+		}
+	}
+	return LLMBackend{
+		Invoker:       InvokeDeepseekApi,
+		StreamInvoker: InvokeDeepseekApiStream,
+		APIKey:        a.Config.DeepSeekApiKey,
+		Model:         a.Config.DeepSeekModel,
+	}
 }
 
 func getPortablePaths() (PortablePaths, error) {
@@ -67,6 +97,19 @@ func NewApp(setup *bool) (*App, error, bool) {
 	}
 	app := &App{
 		Paths: paths,
+		Jobs: Store[ApplicationMeta]{
+			BasePath: paths.Jobs,
+			SetDir:   func(m *ApplicationMeta, d string) { m.Dir = d },
+		},
+		Contacts: Store[ContactMeta]{
+			BasePath: paths.Contacts,
+			SetDir:   func(m *ContactMeta, d string) { m.Dir = d },
+			PostRead: func(m *ContactMeta) {
+				if m.Conversations == nil {
+					m.Conversations = []Conversation{}
+				}
+			},
+		},
 	}
 
 	if *setup {

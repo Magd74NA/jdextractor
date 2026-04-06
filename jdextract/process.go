@@ -78,16 +78,7 @@ func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgres
 		baseCover = &c
 	}
 
-	invoker := LLMInvoker(InvokeDeepseekApi)
-	streamInvoker := StreamingLLMInvoker(InvokeDeepseekApiStream)
-	apiKey := a.Config.DeepSeekApiKey
-	model := a.Config.DeepSeekModel
-	if a.Config.Backend == "kimi" {
-		invoker = InvokeKimiApi
-		streamInvoker = InvokeKimiApiStream
-		apiKey = a.Config.KimiApiKey
-		model = a.Config.KimiModel
-	}
+	b := a.Backend()
 
 	onProgress(ProgressEvent{Stage: StageGenerating, Message: "Generating tailored resume\u2026"})
 	onDelta := func(delta string) {
@@ -95,10 +86,10 @@ func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgres
 	}
 	company, role, resume, cover, score, tokens, err := GenerateAll(
 		ctx,
-		invoker,
-		streamInvoker,
-		apiKey,
-		model,
+		b.Invoker,
+		b.StreamInvoker,
+		b.APIKey,
+		b.Model,
 		&a.Client,
 		nodes,
 		baseResume,
@@ -111,8 +102,9 @@ func (a *App) ProcessWithProgress(ctx context.Context, rawText string, onProgres
 	}
 
 	onProgress(ProgressEvent{Stage: StageSaving, Message: "Saving files\u2026"})
-	slug := slugify(nodes) //NEED TO UPDATE TO NOT USE NODES MAYBE?
-	if err := createApplicationDirectory(slug, a); err != nil {
+	slug := slugify(nodes)
+	slug, err = a.Jobs.MkDir(slug)
+	if err != nil {
 		return "", fmt.Errorf("create directory: %w", err)
 	}
 	dir := filepath.Join(a.Paths.Jobs, slug)
