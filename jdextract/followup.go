@@ -45,9 +45,9 @@ func SummarizeConversation(
 	conv Conversation,
 ) (string, error) {
 	var sb strings.Builder
-	sb.WriteString("Summarize the following conversation thread in 1-2 sentences. Be concise and capture the key points.\n\n")
+	fmt.Fprintf(&sb, "Summarize the following conversation thread in 1-2 sentences. Be concise and capture the key points.\n\n")
 	for _, msg := range conv.Messages {
-		sb.WriteString(fmt.Sprintf("[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content))
+		fmt.Fprintf(&sb, "[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content)
 	}
 
 	reqBody := deepseekRequest{
@@ -93,28 +93,27 @@ func GenerateFollowup(
 	systemPrompt := promptConfig.SystemPrompt + "\n\n" + promptConfig.TaskList + "\n\n" + networkingResponseFormat
 
 	var sb strings.Builder
-	sb.WriteString("CONTACT:\n")
-	sb.WriteString(fmt.Sprintf("Name: %s\n", contact.Name))
+	fmt.Fprintf(&sb, "CONTACT:\nName: %s\n", contact.Name)
 	if contact.Company != "" {
-		sb.WriteString(fmt.Sprintf("Company: %s\n", contact.Company))
+		fmt.Fprintf(&sb, "Company: %s\n", contact.Company)
 	}
 	if contact.Role != "" {
-		sb.WriteString(fmt.Sprintf("Role: %s\n", contact.Role))
+		fmt.Fprintf(&sb, "Role: %s\n", contact.Role)
 	}
 	if contact.Source != "" {
-		sb.WriteString(fmt.Sprintf("How we met: %s\n", contact.Source))
+		fmt.Fprintf(&sb, "How we met: %s\n", contact.Source)
 	}
-	sb.WriteString(fmt.Sprintf("Relationship status: %s\n", contact.Status))
+	fmt.Fprintf(&sb, "Relationship status: %s\n", contact.Status)
 	if contact.Notes != "" {
-		sb.WriteString(fmt.Sprintf("Notes: %s\n", contact.Notes))
+		fmt.Fprintf(&sb, "Notes: %s\n", contact.Notes)
 	}
 	if len(contact.Tags) > 0 {
-		sb.WriteString(fmt.Sprintf("Tags: %s\n", strings.Join(contact.Tags, ", ")))
+		fmt.Fprintf(&sb, "Tags: %s\n", strings.Join(contact.Tags, ", "))
 	}
 
-	sb.WriteString("\nCONVERSATION HISTORY:\n")
+	fmt.Fprintf(&sb, "\nCONVERSATION HISTORY:\n")
 	if len(contact.Conversations) == 0 {
-		sb.WriteString("No prior conversations logged.\n")
+		fmt.Fprintf(&sb, "No prior conversations logged.\n")
 	} else {
 		// Include summary for each conversation thread
 		for i, conv := range contact.Conversations {
@@ -122,19 +121,19 @@ func GenerateFollowup(
 			if channel == "" {
 				channel = "unknown"
 			}
-			sb.WriteString(fmt.Sprintf("Thread %d (%s): %s\n", i+1, channel, conv.Summary))
+			fmt.Fprintf(&sb, "Thread %d (%s): %s\n", i+1, channel, conv.Summary)
 		}
 
 		// Include last 5 messages from the most recent conversation for full context
 		latest := contact.Conversations[len(contact.Conversations)-1]
 		if len(latest.Messages) > 0 {
-			sb.WriteString("\nRECENT MESSAGES (latest thread):\n")
+			fmt.Fprintf(&sb, "\nRECENT MESSAGES (latest thread):\n")
 			start := 0
 			if len(latest.Messages) > 5 {
 				start = len(latest.Messages) - 5
 			}
 			for _, msg := range latest.Messages[start:] {
-				sb.WriteString(fmt.Sprintf("[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content))
+				fmt.Fprintf(&sb, "[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content)
 			}
 		}
 	}

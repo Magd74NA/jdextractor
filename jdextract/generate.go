@@ -75,13 +75,9 @@ func GenerateAll(
 	systemPrompt := promptConfig.SystemPrompt + "\n\n" + promptConfig.TaskList + "\n\n" + responseFormat
 
 	var sb strings.Builder
-	sb.WriteString("JOB DESCRIPTION:\n")
-	sb.WriteString(string(jobJSON))
-	sb.WriteString("\n\nBASE RESUME:\n")
-	sb.WriteString(baseResume)
+	fmt.Fprintf(&sb, "JOB DESCRIPTION:\n%s\n\nBASE RESUME:\n%s", jobJSON, baseResume)
 	if baseCover != nil {
-		sb.WriteString("\n\nBASE COVER LETTER:\n")
-		sb.WriteString(*baseCover)
+		fmt.Fprintf(&sb, "\n\nBASE COVER LETTER:\n%s", *baseCover)
 	}
 
 	useStreaming := streamInvoker != nil && onDelta != nil

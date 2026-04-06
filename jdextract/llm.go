@@ -151,7 +151,7 @@ func invokeAPIStream(ctx context.Context, url, authHeader string, c *http.Client
 		if len(chunk.Choices) > 0 {
 			delta := chunk.Choices[0].Delta.Content
 			if delta != "" {
-				sb.WriteString(delta)
+				fmt.Fprintf(&sb, "%s", delta)
 				onDelta(delta)
 			}
 		}
