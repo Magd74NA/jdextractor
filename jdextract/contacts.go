@@ -25,7 +25,7 @@ type ContactMeta struct {
 	Notes         string         `json:"notes,omitempty"`
 	Conversations []Conversation `json:"conversations"`
 	Created       string         `json:"created"` // YYYY-MM-DD
-	Dir           string         `json:"-"`        // populated at read time, excluded from JSON
+	Dir           string         `json:"-"`       // populated at read time, excluded from JSON
 }
 
 // Message is a single message within a conversation thread.

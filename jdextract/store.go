@@ -12,8 +12,8 @@ import (
 // Store provides filesystem CRUD for JSON-backed entities stored as
 // {BasePath}/{slug}/meta.json.
 type Store[T any] struct {
-	BasePath string         // e.g. app.Paths.Jobs or app.Paths.Contacts
-	PostRead func(*T)       // optional fixup after unmarshal (e.g. nil-slice init)
+	BasePath string           // e.g. app.Paths.Jobs or app.Paths.Contacts
+	PostRead func(*T)         // optional fixup after unmarshal (e.g. nil-slice init)
 	SetDir   func(*T, string) // populates Dir field after reading from disk
 }
 
