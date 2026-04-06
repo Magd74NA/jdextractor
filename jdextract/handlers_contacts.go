@@ -95,22 +95,22 @@ func (a *App) handleDeleteContact(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleAddConversation appends a conversation entry to a contact.
+// handleAddConversation appends a conversation thread to a contact.
 func (a *App) handleAddConversation(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !validID(id) {
 		http.Error(w, "invalid contact id", http.StatusBadRequest)
 		return
 	}
-	var entry ConversationEntry
-	if !decodeBody(w, r, &entry) {
+	var conv Conversation
+	if !decodeBody(w, r, &conv) {
 		return
 	}
-	if entry.Summary == "" {
+	if conv.Summary == "" {
 		http.Error(w, "summary is required", http.StatusBadRequest)
 		return
 	}
-	if err := AddConversation(a, id, entry); err != nil {
+	if err := AddConversation(a, id, conv); err != nil {
 		http.Error(w, "add conversation: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -135,6 +135,131 @@ func (a *App) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAddMessage appends a message to an existing conversation thread.
+func (a *App) handleAddMessage(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		http.Error(w, "invalid contact id", http.StatusBadRequest)
+		return
+	}
+	indexStr := r.PathValue("index")
+	index, err := strconv.Atoi(indexStr)
+	if err != nil || index < 0 {
+		http.Error(w, "invalid conversation index", http.StatusBadRequest)
+		return
+	}
+	var msg Message
+	if !decodeBody(w, r, &msg) {
+		return
+	}
+	if msg.Content == "" || msg.Sender == "" {
+		http.Error(w, "sender and content are required", http.StatusBadRequest)
+		return
+	}
+	if err := AddMessage(a, id, index, msg); err != nil {
+		http.Error(w, "add message: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeleteMessage removes a message by index from a conversation thread.
+func (a *App) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		http.Error(w, "invalid contact id", http.StatusBadRequest)
+		return
+	}
+	convIdx, err := strconv.Atoi(r.PathValue("index"))
+	if err != nil || convIdx < 0 {
+		http.Error(w, "invalid conversation index", http.StatusBadRequest)
+		return
+	}
+	msgIdx, err := strconv.Atoi(r.PathValue("msgIndex"))
+	if err != nil || msgIdx < 0 {
+		http.Error(w, "invalid message index", http.StatusBadRequest)
+		return
+	}
+	if err := DeleteMessage(a, id, convIdx, msgIdx); err != nil {
+		http.Error(w, "delete message: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleUpdateConversationSummary updates the summary of a conversation.
+func (a *App) handleUpdateConversationSummary(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		http.Error(w, "invalid contact id", http.StatusBadRequest)
+		return
+	}
+	index, err := strconv.Atoi(r.PathValue("index"))
+	if err != nil || index < 0 {
+		http.Error(w, "invalid conversation index", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		Summary string `json:"summary"`
+	}
+	if !decodeBody(w, r, &body) {
+		return
+	}
+	if err := UpdateConversationSummary(a, id, index, body.Summary); err != nil {
+		http.Error(w, "update summary: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleSummarizeConversation uses the LLM to generate a summary from the conversation messages.
+func (a *App) handleSummarizeConversation(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		http.Error(w, "invalid contact id", http.StatusBadRequest)
+		return
+	}
+	index, err := strconv.Atoi(r.PathValue("index"))
+	if err != nil || index < 0 {
+		http.Error(w, "invalid conversation index", http.StatusBadRequest)
+		return
+	}
+	contact, err := GetContact(a, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	if index >= len(contact.Conversations) {
+		http.Error(w, "conversation index out of range", http.StatusBadRequest)
+		return
+	}
+	conv := contact.Conversations[index]
+	if len(conv.Messages) == 0 {
+		http.Error(w, "no messages to summarize", http.StatusBadRequest)
+		return
+	}
+
+	invoker := LLMInvoker(InvokeDeepseekApi)
+	apiKey := a.Config.DeepSeekApiKey
+	model := a.Config.DeepSeekModel
+	if a.Config.Backend == "kimi" {
+		invoker = InvokeKimiApi
+		apiKey = a.Config.KimiApiKey
+		model = a.Config.KimiModel
+	}
+
+	summary, err := SummarizeConversation(r.Context(), invoker, apiKey, model, &a.Client, conv)
+	if err != nil {
+		http.Error(w, "summarize: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	if err := UpdateConversationSummary(a, id, index, summary); err != nil {
+		http.Error(w, "save summary: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"summary": summary})
 }
 
 // handleGenerateFollowup generates a follow-up message (non-streaming).

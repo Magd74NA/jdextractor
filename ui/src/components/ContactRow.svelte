@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api } from '../lib/api';
   import { refreshContacts } from '../lib/stores.svelte';
-  import type { Contact, ContactStatus, ConversationEntry } from '../lib/types';
+  import type { Contact, ContactStatus, Conversation, Message } from '../lib/types';
   import { CONTACT_STATUSES, CHANNELS } from '../lib/types';
 
   let { contact }: { contact: Contact } = $props();
@@ -22,11 +22,26 @@
   let editNotes = $state('');
 
   // New conversation form
-  let showLogForm = $state(false);
-  let newSummary = $state('');
-  let newChannel = $state('');
-  let newNotes = $state('');
-  let logSaving = $state(false);
+  let showNewConvForm = $state(false);
+  let newConvSummary = $state('');
+  let newConvChannel = $state('');
+  let newConvMsgSender = $state('');
+  let newConvMsgContent = $state('');
+  let newConvSaving = $state(false);
+
+  // Expanded conversation threads
+  let expandedConvs = $state<Set<number>>(new Set());
+
+  // Add message form state (per conversation index)
+  let addMsgConvIdx = $state<number | null>(null);
+  let addMsgSender = $state('');
+  let addMsgContent = $state('');
+  let addMsgSaving = $state(false);
+
+  // Inline summary editing
+  let editSummaryIdx = $state<number | null>(null);
+  let editSummaryText = $state('');
+  let summarizing = $state<number | null>(null);
 
   function startEdit() {
     editName = contact.name;
@@ -37,9 +52,7 @@
     editing = true;
   }
 
-  function cancelEdit() {
-    editing = false;
-  }
+  function cancelEdit() { editing = false; }
 
   async function saveMeta() {
     const patch: Partial<Contact> = { name: editName, company: editCompany, role: editRole, notes: editNotes };
@@ -61,27 +74,85 @@
     await refreshContacts();
   }
 
-  async function logConversation() {
-    if (!newSummary.trim()) return;
-    logSaving = true;
+  function toggleConv(idx: number) {
+    const next = new Set(expandedConvs);
+    if (next.has(idx)) next.delete(idx); else next.add(idx);
+    expandedConvs = next;
+  }
+
+  async function createConversation() {
+    if (!newConvSummary.trim()) return;
+    newConvSaving = true;
     try {
-      const entry: ConversationEntry = { date: new Date().toISOString().slice(0, 10), summary: newSummary.trim() };
-      if (newChannel) entry.channel = newChannel;
-      if (newNotes.trim()) entry.notes = newNotes.trim();
-      await api.addConversation(contact.dir, entry);
-      newSummary = '';
-      newChannel = '';
-      newNotes = '';
-      showLogForm = false;
+      const conv: Conversation = {
+        summary: newConvSummary.trim(),
+        messages: [],
+        created: new Date().toISOString().slice(0, 10),
+      };
+      if (newConvChannel) conv.channel = newConvChannel;
+      if (newConvMsgSender.trim() && newConvMsgContent.trim()) {
+        conv.messages.push({
+          sender: newConvMsgSender.trim(),
+          content: newConvMsgContent.trim(),
+          date: new Date().toISOString().slice(0, 10),
+        });
+      }
+      await api.addConversation(contact.dir, conv);
+      newConvSummary = ''; newConvChannel = ''; newConvMsgSender = ''; newConvMsgContent = '';
+      showNewConvForm = false;
       await refreshContacts();
     } finally {
-      logSaving = false;
+      newConvSaving = false;
     }
   }
 
   async function deleteConversation(index: number) {
     await api.deleteConversation(contact.dir, index);
     await refreshContacts();
+  }
+
+  async function addMessage(convIdx: number) {
+    if (!addMsgSender.trim() || !addMsgContent.trim()) return;
+    addMsgSaving = true;
+    try {
+      const msg: Message = {
+        sender: addMsgSender.trim(),
+        content: addMsgContent.trim(),
+        date: new Date().toISOString().slice(0, 10),
+      };
+      await api.addMessage(contact.dir, convIdx, msg);
+      addMsgSender = ''; addMsgContent = '';
+      addMsgConvIdx = null;
+      await refreshContacts();
+    } finally {
+      addMsgSaving = false;
+    }
+  }
+
+  async function deleteMessage(convIdx: number, msgIdx: number) {
+    await api.deleteMessage(contact.dir, convIdx, msgIdx);
+    await refreshContacts();
+  }
+
+  function startEditSummary(idx: number, current: string) {
+    editSummaryIdx = idx;
+    editSummaryText = current;
+  }
+
+  async function saveSummary(idx: number) {
+    await api.updateConversationSummary(contact.dir, idx, editSummaryText);
+    editSummaryIdx = null;
+    await refreshContacts();
+  }
+
+  async function summarizeConv(idx: number) {
+    summarizing = idx;
+    try {
+      await api.summarizeConversation(contact.dir, idx);
+      await refreshContacts();
+    } finally {
+      summarizing = null;
+    }
   }
 
   async function generateFollowup() {
@@ -116,6 +187,7 @@
   function copyToClipboard() {
     navigator.clipboard.writeText(generatedMessage);
   }
+
 </script>
 
 <tr>
@@ -201,25 +273,27 @@
         <div class="section">
           <div class="section-header">
             <h4>Conversations</h4>
-            <button class="outline btn-sm" onclick={() => showLogForm = !showLogForm}>
-              {showLogForm ? 'Cancel' : '+ Log'}
+            <button class="outline btn-sm" onclick={() => { showNewConvForm = !showNewConvForm; }}>
+              {showNewConvForm ? 'Cancel' : '+ New Thread'}
             </button>
           </div>
 
-          {#if showLogForm}
+          {#if showNewConvForm}
             <div class="log-form">
               <div class="form-row">
-                <select bind:value={newChannel}>
+                <select bind:value={newConvChannel}>
                   <option value="">Channel (optional)</option>
                   {#each CHANNELS as ch}
                     <option value={ch}>{ch}</option>
                   {/each}
                 </select>
               </div>
-              <textarea rows={2} bind:value={newSummary} placeholder="Summary (required)"></textarea>
-              <textarea rows={1} bind:value={newNotes} placeholder="Additional notes (optional)"></textarea>
-              <button onclick={logConversation} aria-busy={logSaving} disabled={!newSummary.trim() || logSaving}>
-                Save
+              <input bind:value={newConvSummary} placeholder="Summary (required)" />
+              <div class="form-sub-header">First message (optional)</div>
+              <input bind:value={newConvMsgSender} placeholder="Sender name" />
+              <textarea rows={2} bind:value={newConvMsgContent} placeholder="Message content"></textarea>
+              <button onclick={createConversation} aria-busy={newConvSaving} disabled={!newConvSummary.trim() || newConvSaving}>
+                Create Thread
               </button>
             </div>
           {/if}
@@ -227,16 +301,79 @@
           {#if contact.conversations.length === 0}
             <p class="muted">No conversations logged yet.</p>
           {:else}
-            <div class="timeline">
+            <div class="conv-list">
               {#each contact.conversations as conv, i}
-                <div class="timeline-entry">
-                  <div class="timeline-meta">
-                    <span class="conv-date">{conv.date}</span>
-                    {#if conv.channel}<span class="conv-channel">{conv.channel}</span>{/if}
-                    <button class="outline btn-sm danger-btn" onclick={() => deleteConversation(i)} title="Delete">✕</button>
+                <div class="conv-card">
+                  <!-- Conversation header (always visible, clickable) -->
+                  <div class="conv-header" role="button" tabindex="0" onclick={() => toggleConv(i)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleConv(i); }}>
+                    <div class="conv-header-left">
+                      <span class="conv-toggle">{expandedConvs.has(i) ? '▾' : '▸'}</span>
+                      {#if editSummaryIdx === i}
+                        <!-- svelte-ignore a11y_autofocus -->
+                        <input class="edit-input summary-edit" bind:value={editSummaryText}
+                          onclick={(e) => e.stopPropagation()}
+                          onkeydown={(e) => { if (e.key === 'Enter') saveSummary(i); if (e.key === 'Escape') editSummaryIdx = null; }}
+                          autofocus />
+                      {:else}
+                        <span class="conv-summary">{conv.summary}</span>
+                      {/if}
+                    </div>
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <div class="conv-header-right" onclick={(e) => e.stopPropagation()}>
+                      {#if conv.channel}<span class="conv-channel">{conv.channel}</span>{/if}
+                      <span class="conv-meta">{conv.messages.length} msg</span>
+                      <span class="conv-date">{conv.created}</span>
+                      {#if editSummaryIdx === i}
+                        <button class="outline btn-sm save-btn" onclick={() => saveSummary(i)} title="Save">💾</button>
+                        <button class="outline btn-sm" onclick={() => editSummaryIdx = null} title="Cancel">✕</button>
+                      {:else}
+                        <button class="outline btn-sm" onclick={() => startEditSummary(i, conv.summary)} title="Edit summary">✏</button>
+                        {#if conv.messages.length > 0}
+                          <button class="outline btn-sm" onclick={() => summarizeConv(i)}
+                            aria-busy={summarizing === i} disabled={summarizing === i} title="AI Summarize">✦</button>
+                        {/if}
+                        <button class="outline btn-sm danger-btn" onclick={() => deleteConversation(i)} title="Delete thread">✕</button>
+                      {/if}
+                    </div>
                   </div>
-                  <p class="conv-summary">{conv.summary}</p>
-                  {#if conv.notes}<p class="conv-notes muted">{conv.notes}</p>{/if}
+
+                  <!-- Expanded: message thread -->
+                  {#if expandedConvs.has(i)}
+                    <div class="msg-thread">
+                      {#if conv.messages.length === 0}
+                        <p class="muted">No messages yet.</p>
+                      {:else}
+                        {#each conv.messages as msg, mi}
+                          <div class="msg-entry">
+                            <div class="msg-header">
+                              <span class="msg-sender">{msg.sender}</span>
+                              <span class="msg-date">{msg.date}</span>
+                              <button class="outline btn-xs danger-btn" onclick={() => deleteMessage(i, mi)} title="Delete">✕</button>
+                            </div>
+                            <p class="msg-content">{msg.content}</p>
+                          </div>
+                        {/each}
+                      {/if}
+
+                      <!-- Add message form -->
+                      {#if addMsgConvIdx === i}
+                        <div class="add-msg-form">
+                          <input bind:value={addMsgSender} placeholder="Sender name (e.g. me, Jane)" />
+                          <textarea rows={2} bind:value={addMsgContent} placeholder="Message content"></textarea>
+                          <div class="form-actions">
+                            <button onclick={() => addMessage(i)} aria-busy={addMsgSaving}
+                              disabled={!addMsgSender.trim() || !addMsgContent.trim() || addMsgSaving}>Add</button>
+                            <button class="outline" onclick={() => addMsgConvIdx = null}>Cancel</button>
+                          </div>
+                        </div>
+                      {:else}
+                        <button class="outline btn-sm" onclick={() => { addMsgConvIdx = i; addMsgSender = ''; addMsgContent = ''; }}>
+                          + Add Message
+                        </button>
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -282,6 +419,12 @@
   .btn-sm {
     padding: 0.25em 0.45em;
     margin-bottom: 0;
+  }
+
+  .btn-xs {
+    padding: 0.1em 0.3em;
+    margin-bottom: 0;
+    font-size: 0.7rem;
   }
 
   .danger-btn {
@@ -417,16 +560,7 @@
     border-radius: 4px;
   }
 
-  .form-row {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .form-row select {
-    flex: 1;
-    font-size: 0.85rem;
-  }
-
+  .log-form input,
   .log-form textarea {
     font-size: 0.85rem;
     margin-bottom: 0;
@@ -437,28 +571,79 @@
     margin-bottom: 0;
   }
 
-  .timeline {
+  .form-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .form-row select {
+    flex: 1;
+    font-size: 0.85rem;
+  }
+
+  .form-sub-header {
+    font-size: 0.78rem;
+    color: var(--pico-muted-color);
+    font-weight: 600;
+    margin-top: 0.25rem;
+  }
+
+  /* Conversation cards */
+  .conv-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
-  .timeline-entry {
-    border-left: 2px solid var(--pico-muted-border-color);
-    padding-left: 0.75rem;
+  .conv-card {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 4px;
   }
 
-  .timeline-meta {
+  .conv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    gap: 0.5rem;
+  }
+
+  .conv-header:hover {
+    background: color-mix(in srgb, var(--pico-muted-border-color) 20%, transparent);
+  }
+
+  .conv-header-left {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.25rem;
+    min-width: 0;
+    flex: 1;
   }
 
-  .conv-date {
+  .conv-toggle {
     font-size: 0.78rem;
     color: var(--pico-muted-color);
-    font-family: monospace;
+    flex-shrink: 0;
+  }
+
+  .conv-summary {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .summary-edit {
+    flex: 1;
+    font-size: 0.85rem;
+  }
+
+  .conv-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
   }
 
   .conv-channel {
@@ -469,15 +654,84 @@
     border-radius: 3px;
   }
 
-  .conv-summary {
-    font-size: 0.85rem;
+  .conv-meta {
+    font-size: 0.72rem;
+    color: var(--pico-muted-color);
+  }
+
+  .conv-date {
+    font-size: 0.72rem;
+    color: var(--pico-muted-color);
+    font-family: monospace;
+  }
+
+  /* Message thread */
+  .msg-thread {
+    padding: 0.5rem 0.75rem 0.75rem;
+    border-top: 1px solid var(--pico-muted-border-color);
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .msg-entry {
+    border-left: 2px solid var(--pico-muted-border-color);
+    padding-left: 0.6rem;
+  }
+
+  .msg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .msg-sender {
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .msg-date {
+    font-size: 0.72rem;
+    color: var(--pico-muted-color);
+    font-family: monospace;
+  }
+
+  .msg-content {
+    font-size: 0.82rem;
     margin: 0;
+    white-space: pre-wrap;
   }
 
-  .conv-notes {
-    font-size: 0.78rem;
+  .add-msg-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border: 1px dashed var(--pico-muted-border-color);
+    border-radius: 4px;
   }
 
+  .add-msg-form input,
+  .add-msg-form textarea {
+    font-size: 0.82rem;
+    margin-bottom: 0;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .form-actions button {
+    margin-bottom: 0;
+    font-size: 0.82rem;
+    padding: 0.25em 0.6em;
+  }
+
+  /* Follow-up generator */
   .generated {
     display: flex;
     flex-direction: column;

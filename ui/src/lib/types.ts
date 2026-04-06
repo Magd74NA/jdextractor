@@ -53,11 +53,17 @@ export type JobStatus = 'draft' | 'applied' | 'interviewing' | 'offer' | 'reject
 
 export const JOB_STATUSES: JobStatus[] = ['draft', 'applied', 'interviewing', 'offer', 'rejected'];
 
-export interface ConversationEntry {
+export interface Message {
+  sender: string;
+  content: string;
   date: string;
+}
+
+export interface Conversation {
   channel?: string;
   summary: string;
-  notes?: string;
+  messages: Message[];
+  created: string;
 }
 
 export interface Contact {
@@ -74,7 +80,7 @@ export interface Contact {
   linked_jobs?: string[];
   tags?: string[];
   notes?: string;
-  conversations: ConversationEntry[];
+  conversations: Conversation[];
   created: string;
 }
 

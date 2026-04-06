@@ -456,17 +456,16 @@ func cmdContactsStatus(args []string) {
 
 func cmdContactsLog(args []string) {
 	fs := flag.NewFlagSet("contacts log", flag.ExitOnError)
-	summary := fs.String("summary", "", "What was discussed (required)")
+	summary := fs.String("summary", "", "Thread summary (required for new thread)")
 	channel := fs.String("channel", "", "Channel: email, linkedin, phone, in-person, event, other")
-	notes := fs.String("notes", "", "Additional context")
+	message := fs.String("message", "", "Message content")
+	sender := fs.String("sender", "me", "Message sender name")
+	conv := fs.Int("conv", -1, "Conversation index to add message to (appends to existing thread)")
 	fs.Parse(args)
 
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: jdextract contacts log <prefix> --summary <text> [--channel <ch>]")
-		os.Exit(1)
-	}
-	if *summary == "" {
-		fmt.Fprintln(os.Stderr, "error: --summary is required")
+		fmt.Fprintln(os.Stderr, "usage: jdextract contacts log <prefix> --summary <text> [--channel <ch>] [--message <text>] [--sender <name>]")
+		fmt.Fprintln(os.Stderr, "       jdextract contacts log <prefix> --conv <index> --message <text> [--sender <name>]")
 		os.Exit(1)
 	}
 
@@ -476,16 +475,35 @@ func cmdContactsLog(args []string) {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}
-	entry := jdextract.ConversationEntry{
-		Summary: *summary,
-		Channel: *channel,
-		Notes:   *notes,
+
+	if *conv >= 0 {
+		// Append message to existing conversation
+		if *message == "" {
+			fmt.Fprintln(os.Stderr, "error: --message is required when using --conv")
+			os.Exit(1)
+		}
+		msg := jdextract.Message{Sender: *sender, Content: *message}
+		if err := jdextract.AddMessage(app, dir, *conv, msg); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Added message to conversation %d for %s\n", *conv, dir)
+	} else {
+		// Create new conversation thread
+		if *summary == "" {
+			fmt.Fprintln(os.Stderr, "error: --summary is required for new conversation")
+			os.Exit(1)
+		}
+		c := jdextract.Conversation{Summary: *summary, Channel: *channel, Messages: []jdextract.Message{}}
+		if *message != "" {
+			c.Messages = append(c.Messages, jdextract.Message{Sender: *sender, Content: *message})
+		}
+		if err := jdextract.AddConversation(app, dir, c); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Created conversation for %s\n", dir)
 	}
-	if err := jdextract.AddConversation(app, dir, entry); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Logged conversation for %s\n", dir)
 }
 
 func cmdContactsFollowup(args []string) {

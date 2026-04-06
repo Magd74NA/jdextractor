@@ -35,6 +35,48 @@ var (
 	followupNotesRe   = regexp.MustCompile(`(?s)<notes>(.*?)</notes>`)
 )
 
+// SummarizeConversation uses the LLM to generate a concise summary from a conversation's messages.
+func SummarizeConversation(
+	ctx context.Context,
+	invoker LLMInvoker,
+	apiKey string,
+	model string,
+	c *http.Client,
+	conv Conversation,
+) (string, error) {
+	var sb strings.Builder
+	sb.WriteString("Summarize the following conversation thread in 1-2 sentences. Be concise and capture the key points.\n\n")
+	for _, msg := range conv.Messages {
+		sb.WriteString(fmt.Sprintf("[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content))
+	}
+
+	reqBody := deepseekRequest{
+		Model: model,
+		Messages: []deepseekMessage{
+			{Role: "system", Content: "You are a concise summarizer. Respond with only the summary, no preamble."},
+			{Role: "user", Content: sb.String()},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	raw, err := invoker(ctx, apiKey, c, 0, json.RawMessage(bodyBytes))
+	if err != nil {
+		return "", err
+	}
+	var apiResp deepseekResponse
+	if err := json.Unmarshal([]byte(raw), &apiResp); err != nil {
+		return "", fmt.Errorf("decode api response: %w", err)
+	}
+	if len(apiResp.Choices) == 0 {
+		return "", fmt.Errorf("api returned no choices")
+	}
+	return strings.TrimSpace(apiResp.Choices[0].Message.Content), nil
+}
+
 // GenerateFollowup builds a prompt from contact context and conversation history,
 // calls the LLM, and parses the XML-tagged response. Follows the same pattern as GenerateAll.
 func GenerateFollowup(
@@ -74,12 +116,27 @@ func GenerateFollowup(
 	if len(contact.Conversations) == 0 {
 		sb.WriteString("No prior conversations logged.\n")
 	} else {
-		convJSON, err := json.MarshalIndent(contact.Conversations, "", "  ")
-		if err != nil {
-			return nil, fmt.Errorf("json encode conversations: %w", err)
+		// Include summary for each conversation thread
+		for i, conv := range contact.Conversations {
+			channel := conv.Channel
+			if channel == "" {
+				channel = "unknown"
+			}
+			sb.WriteString(fmt.Sprintf("Thread %d (%s): %s\n", i+1, channel, conv.Summary))
 		}
-		sb.Write(convJSON)
-		sb.WriteString("\n")
+
+		// Include last 5 messages from the most recent conversation for full context
+		latest := contact.Conversations[len(contact.Conversations)-1]
+		if len(latest.Messages) > 0 {
+			sb.WriteString("\nRECENT MESSAGES (latest thread):\n")
+			start := 0
+			if len(latest.Messages) > 5 {
+				start = len(latest.Messages) - 5
+			}
+			for _, msg := range latest.Messages[start:] {
+				sb.WriteString(fmt.Sprintf("[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content))
+			}
+		}
 	}
 
 	useStreaming := streamInvoker != nil && onDelta != nil

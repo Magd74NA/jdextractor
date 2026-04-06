@@ -27,17 +27,24 @@ type ContactMeta struct {
 	LinkedJobs    []string            `json:"linked_jobs,omitempty"`    // job directory names
 	Tags          []string            `json:"tags,omitempty"`           // freeform: recruiter, engineer, etc.
 	Notes         string              `json:"notes,omitempty"`
-	Conversations []ConversationEntry `json:"conversations"`
+	Conversations []Conversation `json:"conversations"`
 	Created       string              `json:"created"` // YYYY-MM-DD
 	Dir           string              `json:"-"`       // populated at read time, excluded from JSON
 }
 
-// ConversationEntry is a single logged interaction with a contact.
-type ConversationEntry struct {
-	Date    string `json:"date"`              // YYYY-MM-DD
-	Channel string `json:"channel,omitempty"` // email, linkedin, phone, in-person, event, other
-	Summary string `json:"summary"`
-	Notes   string `json:"notes,omitempty"`
+// Message is a single message within a conversation thread.
+type Message struct {
+	Sender  string `json:"sender"`  // freeform name: "me", "Jane Doe", etc.
+	Content string `json:"content"`
+	Date    string `json:"date"` // YYYY-MM-DD
+}
+
+// Conversation is a thread of messages with a contact.
+type Conversation struct {
+	Channel  string    `json:"channel,omitempty"` // email, linkedin, phone, in-person, event, other
+	Summary  string    `json:"summary"`           // user-written, optionally LLM-regenerated
+	Messages []Message `json:"messages"`
+	Created  string    `json:"created"` // YYYY-MM-DD
 }
 
 // ContactUpdate holds optional fields for partial contact updates.
@@ -99,7 +106,7 @@ func readContactMeta(path string) (*ContactMeta, error) {
 		return nil, err
 	}
 	if m.Conversations == nil {
-		m.Conversations = []ConversationEntry{}
+		m.Conversations = []Conversation{}
 	}
 	return &m, nil
 }
@@ -122,7 +129,7 @@ func CreateContact(a *App, meta ContactMeta) (string, error) {
 	}
 	meta.Created = currentDate()
 	if meta.Conversations == nil {
-		meta.Conversations = []ConversationEntry{}
+		meta.Conversations = []Conversation{}
 	}
 
 	slug := contactSlugify(meta.Name)
@@ -260,16 +267,19 @@ func DeleteContact(a *App, dir string) error {
 	return os.RemoveAll(path)
 }
 
-// AddConversation appends a conversation entry to a contact's meta.json.
-func AddConversation(a *App, dir string, entry ConversationEntry) error {
+// AddConversation appends a conversation thread to a contact's meta.json.
+func AddConversation(a *App, dir string, conv Conversation) error {
 	if !validContactID(dir) {
 		return fmt.Errorf("invalid contact id %q", dir)
 	}
-	if entry.Summary == "" {
+	if conv.Summary == "" {
 		return fmt.Errorf("conversation summary is required")
 	}
-	if entry.Date == "" {
-		entry.Date = currentDate()
+	if conv.Created == "" {
+		conv.Created = currentDate()
+	}
+	if conv.Messages == nil {
+		conv.Messages = []Message{}
 	}
 
 	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
@@ -277,7 +287,72 @@ func AddConversation(a *App, dir string, entry ConversationEntry) error {
 	if err != nil {
 		return fmt.Errorf("read meta.json: %w", err)
 	}
-	m.Conversations = append(m.Conversations, entry)
+	m.Conversations = append(m.Conversations, conv)
+	return writeContactMeta(metaPath, m)
+}
+
+// AddMessage appends a message to an existing conversation thread.
+func AddMessage(a *App, dir string, convIndex int, msg Message) error {
+	if !validContactID(dir) {
+		return fmt.Errorf("invalid contact id %q", dir)
+	}
+	if msg.Content == "" {
+		return fmt.Errorf("message content is required")
+	}
+	if msg.Sender == "" {
+		return fmt.Errorf("message sender is required")
+	}
+	if msg.Date == "" {
+		msg.Date = currentDate()
+	}
+
+	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
+	m, err := readContactMeta(metaPath)
+	if err != nil {
+		return fmt.Errorf("read meta.json: %w", err)
+	}
+	if convIndex < 0 || convIndex >= len(m.Conversations) {
+		return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
+	}
+	m.Conversations[convIndex].Messages = append(m.Conversations[convIndex].Messages, msg)
+	return writeContactMeta(metaPath, m)
+}
+
+// DeleteMessage removes a message by index from a conversation thread.
+func DeleteMessage(a *App, dir string, convIndex, msgIndex int) error {
+	if !validContactID(dir) {
+		return fmt.Errorf("invalid contact id %q", dir)
+	}
+	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
+	m, err := readContactMeta(metaPath)
+	if err != nil {
+		return fmt.Errorf("read meta.json: %w", err)
+	}
+	if convIndex < 0 || convIndex >= len(m.Conversations) {
+		return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
+	}
+	msgs := m.Conversations[convIndex].Messages
+	if msgIndex < 0 || msgIndex >= len(msgs) {
+		return fmt.Errorf("message index %d out of range (0-%d)", msgIndex, len(msgs)-1)
+	}
+	m.Conversations[convIndex].Messages = append(msgs[:msgIndex], msgs[msgIndex+1:]...)
+	return writeContactMeta(metaPath, m)
+}
+
+// UpdateConversationSummary updates the summary of a conversation thread.
+func UpdateConversationSummary(a *App, dir string, convIndex int, summary string) error {
+	if !validContactID(dir) {
+		return fmt.Errorf("invalid contact id %q", dir)
+	}
+	metaPath := filepath.Join(a.Paths.Contacts, dir, "meta.json")
+	m, err := readContactMeta(metaPath)
+	if err != nil {
+		return fmt.Errorf("read meta.json: %w", err)
+	}
+	if convIndex < 0 || convIndex >= len(m.Conversations) {
+		return fmt.Errorf("conversation index %d out of range (0-%d)", convIndex, len(m.Conversations)-1)
+	}
+	m.Conversations[convIndex].Summary = summary
 	return writeContactMeta(metaPath, m)
 }
 

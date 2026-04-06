@@ -1,4 +1,4 @@
-import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult, ProgressEvent, Contact, ConversationEntry, FollowupResult, NetworkingPromptConfig } from './types';
+import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult, ProgressEvent, Contact, Conversation, Message, FollowupResult, NetworkingPromptConfig } from './types';
 
 const BASE = '/api';
 
@@ -48,10 +48,18 @@ export const api = {
   getContact: (id: string) => request<Contact>('GET', `/contacts/${id}`),
   updateContact: (id: string, data: Partial<Contact>) => request<null>('PATCH', `/contacts/${id}`, data),
   deleteContact: (id: string) => request<null>('DELETE', `/contacts/${id}`),
-  addConversation: (id: string, entry: ConversationEntry) =>
-    request<null>('POST', `/contacts/${id}/conversations`, entry),
+  addConversation: (id: string, conv: Conversation) =>
+    request<null>('POST', `/contacts/${id}/conversations`, conv),
   deleteConversation: (id: string, index: number) =>
     request<null>('DELETE', `/contacts/${id}/conversations/${index}`),
+  updateConversationSummary: (id: string, index: number, summary: string) =>
+    request<null>('PATCH', `/contacts/${id}/conversations/${index}`, { summary }),
+  summarizeConversation: (id: string, index: number) =>
+    request<{ summary: string }>('POST', `/contacts/${id}/conversations/${index}/summarize`),
+  addMessage: (id: string, convIndex: number, msg: Message) =>
+    request<null>('POST', `/contacts/${id}/conversations/${convIndex}/messages`, msg),
+  deleteMessage: (id: string, convIndex: number, msgIndex: number) =>
+    request<null>('DELETE', `/contacts/${id}/conversations/${convIndex}/messages/${msgIndex}`),
   generateFollowup: (id: string) => request<FollowupResult>('POST', `/contacts/${id}/followup`),
   generateFollowupStream: async (id: string, onProgress: (event: ProgressEvent) => void): Promise<FollowupResult> => {
     const final = await consumeSSERaw(`${BASE}/contacts/${id}/followup/stream`, {}, onProgress);

@@ -46,6 +46,10 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/contacts/{id}", a.handleDeleteContact)
 	mux.HandleFunc("POST /api/contacts/{id}/conversations", a.handleAddConversation)
 	mux.HandleFunc("DELETE /api/contacts/{id}/conversations/{index}", a.handleDeleteConversation)
+	mux.HandleFunc("PATCH /api/contacts/{id}/conversations/{index}", a.handleUpdateConversationSummary)
+	mux.HandleFunc("POST /api/contacts/{id}/conversations/{index}/summarize", a.handleSummarizeConversation)
+	mux.HandleFunc("POST /api/contacts/{id}/conversations/{index}/messages", a.handleAddMessage)
+	mux.HandleFunc("DELETE /api/contacts/{id}/conversations/{index}/messages/{msgIndex}", a.handleDeleteMessage)
 	mux.HandleFunc("POST /api/contacts/{id}/followup", a.handleGenerateFollowup)
 	mux.HandleFunc("POST /api/contacts/{id}/followup/stream", a.handleGenerateFollowupStream)
 
