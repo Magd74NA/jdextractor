@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { api } from '../lib/api';
-  import type { Contact, FollowupResult } from '../lib/types';
+  import { api } from "../lib/api";
+  import type { Contact, FollowupResult } from "../lib/types";
 
   let overdue = $state<Contact[]>([]);
   let upcoming = $state<Contact[]>([]);
   let loading = $state(true);
-  let error = $state('');
+  let error = $state("");
 
   let generating = $state<Record<string, boolean>>({});
   let streamingText = $state<Record<string, string>>({});
@@ -18,10 +18,14 @@
         api.getOverdueFollowups(),
         api.getUpcomingFollowups(7),
       ]);
-      overdue = o.sort((a, b) => (a.follow_up_date ?? '').localeCompare(b.follow_up_date ?? ''));
-      upcoming = u.sort((a, b) => (a.follow_up_date ?? '').localeCompare(b.follow_up_date ?? ''));
+      overdue = o.sort((a, b) =>
+        (a.follow_up_date ?? "").localeCompare(b.follow_up_date ?? ""),
+      );
+      upcoming = u.sort((a, b) =>
+        (a.follow_up_date ?? "").localeCompare(b.follow_up_date ?? ""),
+      );
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load follow-ups';
+      error = e instanceof Error ? e.message : "Failed to load follow-ups";
     } finally {
       loading = false;
     }
@@ -30,35 +34,43 @@
   function daysFromToday(dateStr: string): number {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const target = new Date(dateStr + 'T00:00:00');
+    const target = new Date(dateStr + "T00:00:00");
     return Math.round((target.getTime() - today.getTime()) / 86400000);
   }
 
   function lastConvSnippet(contact: Contact): string {
-    if (!contact.conversations || contact.conversations.length === 0) return '';
+    if (!contact.conversations || contact.conversations.length === 0) return "";
     const conv = contact.conversations.at(-1);
-    if (!conv) return '';
-    return conv.summary.length > 80 ? conv.summary.slice(0, 77) + '...' : conv.summary;
+    if (!conv) return "";
+    return conv.summary.length > 80 ?
+        conv.summary.slice(0, 77) + "..."
+      : conv.summary;
   }
 
   function lastChannel(contact: Contact): string {
-    if (!contact.conversations || contact.conversations.length === 0) return '';
-    return contact.conversations.at(-1)?.channel ?? '';
+    if (!contact.conversations || contact.conversations.length === 0) return "";
+    return contact.conversations.at(-1)?.channel ?? "";
   }
 
   async function handleGenerate(dir: string) {
     generating = { ...generating, [dir]: true };
-    streamingText = { ...streamingText, [dir]: '' };
-    generateErrors = { ...generateErrors, [dir]: '' };
+    streamingText = { ...streamingText, [dir]: "" };
+    generateErrors = { ...generateErrors, [dir]: "" };
     try {
       const result = await api.generateFollowupStream(dir, (event) => {
-        if (event.stage === 'content' && event.delta) {
-          streamingText = { ...streamingText, [dir]: (streamingText[dir] ?? '') + event.delta };
+        if (event.stage === "content" && event.delta) {
+          streamingText = {
+            ...streamingText,
+            [dir]: (streamingText[dir] ?? "") + event.delta,
+          };
         }
       });
       generatedResults = { ...generatedResults, [dir]: result };
     } catch (e) {
-      generateErrors = { ...generateErrors, [dir]: e instanceof Error ? e.message : 'Generation failed' };
+      generateErrors = {
+        ...generateErrors,
+        [dir]: e instanceof Error ? e.message : "Generation failed",
+      };
     } finally {
       generating = { ...generating, [dir]: false };
     }
@@ -79,27 +91,36 @@
 {:else if overdue.length === 0 && upcoming.length === 0}
   <p class="muted">No follow-ups scheduled.</p>
 {:else}
-
   {#if overdue.length > 0}
     <div class="queue-group">
       <h4 class="queue-title overdue-title">Overdue ({overdue.length})</h4>
       {#each overdue as contact (contact.dir)}
-        {@const days = daysFromToday(contact.follow_up_date ?? '')}
+        {@const days = daysFromToday(contact.follow_up_date ?? "")}
         <div class="queue-item overdue-item">
           <div class="queue-row">
             <div class="queue-left">
               <a href="#/contacts" class="queue-name">{contact.name}</a>
-              {#if contact.company}<span class="queue-company">{contact.company}</span>{/if}
-              {#if lastChannel(contact)}<span class="channel-badge">{lastChannel(contact)}</span>{/if}
+              {#if contact.company}<span class="queue-company"
+                  >{contact.company}</span
+                >{/if}
+              {#if lastChannel(contact)}<span class="channel-badge"
+                  >{lastChannel(contact)}</span
+                >{/if}
             </div>
             <div class="queue-center">
               <span class="queue-snippet">{lastConvSnippet(contact)}</span>
             </div>
             <div class="queue-right">
               <span class="queue-date">{contact.follow_up_date}</span>
-              <span class="days-badge overdue-badge">{Math.abs(days)}d overdue</span>
-              <button class="outline btn-sm" onclick={() => handleGenerate(contact.dir)}
-                aria-busy={generating[contact.dir]} disabled={generating[contact.dir]}>
+              <span class="days-badge overdue-badge"
+                >{Math.abs(days)}d overdue</span
+              >
+              <button
+                class="outline btn-sm"
+                onclick={() => handleGenerate(contact.dir)}
+                aria-busy={generating[contact.dir]}
+                disabled={generating[contact.dir]}
+              >
                 Generate
               </button>
             </div>
@@ -117,12 +138,20 @@
             {@const result = generatedResults[contact.dir]!}
             <div class="generated">
               {#if result.subject}
-                <p class="gen-meta"><strong>Subject:</strong> {result.subject}</p>
+                <p class="gen-meta">
+                  <strong>Subject:</strong>
+                  {result.subject}
+                </p>
               {/if}
               <pre class="message-box">{result.message}</pre>
               <div class="gen-footer">
-                <span class="muted">Channel: {result.channel} · Timing: {result.timing}</span>
-                <button class="outline btn-sm" onclick={() => copyToClipboard(contact.dir)}>Copy</button>
+                <span class="muted"
+                  >Channel: {result.channel} · Timing: {result.timing}</span
+                >
+                <button
+                  class="outline btn-sm"
+                  onclick={() => copyToClipboard(contact.dir)}>Copy</button
+                >
               </div>
             </div>
           {/if}
@@ -135,13 +164,17 @@
     <div class="queue-group">
       <h4 class="queue-title">Upcoming ({upcoming.length})</h4>
       {#each upcoming as contact (contact.dir)}
-        {@const days = daysFromToday(contact.follow_up_date ?? '')}
+        {@const days = daysFromToday(contact.follow_up_date ?? "")}
         <div class="queue-item">
           <div class="queue-row">
             <div class="queue-left">
               <a href="#/contacts" class="queue-name">{contact.name}</a>
-              {#if contact.company}<span class="queue-company">{contact.company}</span>{/if}
-              {#if lastChannel(contact)}<span class="channel-badge">{lastChannel(contact)}</span>{/if}
+              {#if contact.company}<span class="queue-company"
+                  >{contact.company}</span
+                >{/if}
+              {#if lastChannel(contact)}<span class="channel-badge"
+                  >{lastChannel(contact)}</span
+                >{/if}
             </div>
             <div class="queue-center">
               <span class="queue-snippet">{lastConvSnippet(contact)}</span>
@@ -149,8 +182,12 @@
             <div class="queue-right">
               <span class="queue-date">{contact.follow_up_date}</span>
               <span class="days-badge">{days}d</span>
-              <button class="outline btn-sm" onclick={() => handleGenerate(contact.dir)}
-                aria-busy={generating[contact.dir]} disabled={generating[contact.dir]}>
+              <button
+                class="outline btn-sm"
+                onclick={() => handleGenerate(contact.dir)}
+                aria-busy={generating[contact.dir]}
+                disabled={generating[contact.dir]}
+              >
                 Generate
               </button>
             </div>
@@ -168,12 +205,20 @@
             {@const upResult = generatedResults[contact.dir]!}
             <div class="generated">
               {#if upResult.subject}
-                <p class="gen-meta"><strong>Subject:</strong> {upResult.subject}</p>
+                <p class="gen-meta">
+                  <strong>Subject:</strong>
+                  {upResult.subject}
+                </p>
               {/if}
               <pre class="message-box">{upResult.message}</pre>
               <div class="gen-footer">
-                <span class="muted">Channel: {upResult.channel} · Timing: {upResult.timing}</span>
-                <button class="outline btn-sm" onclick={() => copyToClipboard(contact.dir)}>Copy</button>
+                <span class="muted"
+                  >Channel: {upResult.channel} · Timing: {upResult.timing}</span
+                >
+                <button
+                  class="outline btn-sm"
+                  onclick={() => copyToClipboard(contact.dir)}>Copy</button
+                >
               </div>
             </div>
           {/if}
@@ -184,6 +229,7 @@
 {/if}
 
 <style>
+  /* Component-specific styles only - shared styles moved to app.css */
   .queue-group {
     margin-bottom: 1.5rem;
   }
@@ -236,14 +282,6 @@
     color: var(--pico-muted-color);
   }
 
-  .channel-badge {
-    font-size: 0.68rem;
-    background: var(--pico-primary-background);
-    color: var(--pico-primary);
-    padding: 0.08rem 0.3rem;
-    border-radius: 3px;
-  }
-
   .queue-center {
     flex: 1;
     min-width: 0;
@@ -281,24 +319,8 @@
   }
 
   .overdue-badge {
-    background: #fecaca;
-    color: #991b1b;
-  }
-
-  .btn-sm {
-    padding: 0.25em 0.45em;
-    margin-bottom: 0;
-  }
-
-  .message-box {
-    white-space: pre-wrap;
-    font-family: inherit;
-    font-size: 0.82rem;
-    background: var(--pico-card-background-color);
-    border: 1px solid var(--pico-muted-border-color);
-    border-radius: 4px;
-    padding: 0.6rem;
-    margin: 0.5rem 0 0;
+    background: var(--badge-low-bg);
+    color: var(--badge-low-fg);
   }
 
   .generated {
@@ -317,16 +339,5 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-  }
-
-  .muted {
-    color: var(--pico-muted-color);
-    font-size: 0.78rem;
-  }
-
-  .error {
-    color: var(--pico-del-color);
-    font-size: 0.82rem;
-    margin: 0.35rem 0 0;
   }
 </style>

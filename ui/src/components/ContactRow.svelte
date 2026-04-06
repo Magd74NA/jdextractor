@@ -1,44 +1,50 @@
 <script lang="ts">
-  import { api } from '../lib/api';
-  import { refreshContacts, getJobs } from '../lib/stores.svelte';
-  import type { Contact, ContactStatus, Conversation, Message } from '../lib/types';
-  import { CONTACT_STATUSES, CHANNELS } from '../lib/types';
+  import { api } from "../lib/api";
+  import { refreshContacts, getJobs } from "../lib/stores.svelte";
+  import type {
+    Contact,
+    ContactStatus,
+    Conversation,
+    Message,
+  } from "../lib/types";
+  import { CONTACT_STATUSES, CHANNELS } from "../lib/types";
 
   let allJobs = $derived(getJobs());
   let showJobPicker = $state(false);
-  let jobSearchQuery = $state('');
+  let jobSearchQuery = $state("");
   let availableJobs = $derived(
-    allJobs.filter(j =>
-      !(contact.linked_jobs ?? []).includes(j.dir) &&
-      (jobSearchQuery === '' ||
-       j.company.toLowerCase().includes(jobSearchQuery.toLowerCase()) ||
-       j.role.toLowerCase().includes(jobSearchQuery.toLowerCase()))
-    )
+    allJobs.filter(
+      (j) =>
+        !(contact.linked_jobs ?? []).includes(j.dir) &&
+        (jobSearchQuery === "" ||
+          j.company.toLowerCase().includes(jobSearchQuery.toLowerCase()) ||
+          j.role.toLowerCase().includes(jobSearchQuery.toLowerCase())),
+    ),
   );
 
   let { contact }: { contact: Contact } = $props();
 
   let expanded = $state(false);
   let generating = $state(false);
-  let generatedMessage = $state('');
-  let generatedSubject = $state('');
-  let generatedChannel = $state('');
-  let generatedTiming = $state('');
-  let generateError = $state('');
+  let generatedMessage = $state("");
+  let generatedSubject = $state("");
+  let generatedChannel = $state("");
+  let generatedTiming = $state("");
+  let generateError = $state("");
 
   let editing = $state(false);
-  let editName = $state('');
-  let editCompany = $state('');
-  let editRole = $state('');
-  let editFollowUp = $state('');
-  let editNotes = $state('');
+  let editName = $state("");
+  let editCompany = $state("");
+  let editRole = $state("");
+  let editFollowUp = $state("");
+  let editNotes = $state("");
 
   // New conversation form
   let showNewConvForm = $state(false);
-  let newConvSummary = $state('');
-  let newConvChannel = $state('');
-  let newConvMsgSender = $state('');
-  let newConvMsgContent = $state('');
+  let newConvSummary = $state("");
+  let newConvChannel = $state("");
+  let newConvMsgSender = $state("");
+  let newConvMsgContent = $state("");
   let newConvSaving = $state(false);
 
   // Expanded conversation threads
@@ -46,28 +52,35 @@
 
   // Add message form state (per conversation index)
   let addMsgConvIdx = $state<number | null>(null);
-  let addMsgSender = $state('');
-  let addMsgContent = $state('');
+  let addMsgSender = $state("");
+  let addMsgContent = $state("");
   let addMsgSaving = $state(false);
 
   // Inline summary editing
   let editSummaryIdx = $state<number | null>(null);
-  let editSummaryText = $state('');
+  let editSummaryText = $state("");
   let summarizing = $state<number | null>(null);
 
   function startEdit() {
     editName = contact.name;
-    editCompany = contact.company ?? '';
-    editRole = contact.role ?? '';
-    editFollowUp = contact.follow_up_date ?? '';
-    editNotes = contact.notes ?? '';
+    editCompany = contact.company ?? "";
+    editRole = contact.role ?? "";
+    editFollowUp = contact.follow_up_date ?? "";
+    editNotes = contact.notes ?? "";
     editing = true;
   }
 
-  function cancelEdit() { editing = false; }
+  function cancelEdit() {
+    editing = false;
+  }
 
   async function saveMeta() {
-    const patch: Partial<Contact> = { name: editName, company: editCompany, role: editRole, notes: editNotes };
+    const patch: Partial<Contact> = {
+      name: editName,
+      company: editCompany,
+      role: editRole,
+      notes: editNotes,
+    };
     if (editFollowUp) patch.follow_up_date = editFollowUp;
     await api.updateContact(contact.dir, patch);
     editing = false;
@@ -88,7 +101,8 @@
 
   function toggleConv(idx: number) {
     const next = new Set(expandedConvs);
-    if (next.has(idx)) next.delete(idx); else next.add(idx);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
     expandedConvs = next;
   }
 
@@ -110,7 +124,10 @@
         });
       }
       await api.addConversation(contact.dir, conv);
-      newConvSummary = ''; newConvChannel = ''; newConvMsgSender = ''; newConvMsgContent = '';
+      newConvSummary = "";
+      newConvChannel = "";
+      newConvMsgSender = "";
+      newConvMsgContent = "";
       showNewConvForm = false;
       await refreshContacts();
     } finally {
@@ -133,7 +150,8 @@
         date: new Date().toISOString().slice(0, 10),
       };
       await api.addMessage(contact.dir, convIdx, msg);
-      addMsgSender = ''; addMsgContent = '';
+      addMsgSender = "";
+      addMsgContent = "";
       addMsgConvIdx = null;
       await refreshContacts();
     } finally {
@@ -169,23 +187,23 @@
 
   async function generateFollowup() {
     generating = true;
-    generatedMessage = '';
-    generatedSubject = '';
-    generatedChannel = '';
-    generatedTiming = '';
-    generateError = '';
+    generatedMessage = "";
+    generatedSubject = "";
+    generatedChannel = "";
+    generatedTiming = "";
+    generateError = "";
     try {
       const result = await api.generateFollowupStream(contact.dir, (event) => {
-        if (event.stage === 'content' && event.delta) {
+        if (event.stage === "content" && event.delta) {
           generatedMessage += event.delta;
         }
       });
       generatedMessage = result.message;
-      generatedSubject = result.subject ?? '';
-      generatedChannel = result.channel ?? '';
-      generatedTiming = result.timing ?? '';
+      generatedSubject = result.subject ?? "";
+      generatedChannel = result.channel ?? "";
+      generatedTiming = result.timing ?? "";
     } catch (e) {
-      generateError = e instanceof Error ? e.message : 'Generation failed';
+      generateError = e instanceof Error ? e.message : "Generation failed";
     } finally {
       generating = false;
     }
@@ -194,14 +212,16 @@
   async function addLinkedJob(jobDir: string) {
     const current = contact.linked_jobs ?? [];
     await api.updateContact(contact.dir, { linked_jobs: [...current, jobDir] });
-    jobSearchQuery = '';
+    jobSearchQuery = "";
     showJobPicker = false;
     await refreshContacts();
   }
 
   async function removeLinkedJob(jobDir: string) {
     const current = contact.linked_jobs ?? [];
-    await api.updateContact(contact.dir, { linked_jobs: current.filter(j => j !== jobDir) });
+    await api.updateContact(contact.dir, {
+      linked_jobs: current.filter((j) => j !== jobDir),
+    });
     await refreshContacts();
   }
 
@@ -213,22 +233,25 @@
   function copyToClipboard() {
     navigator.clipboard.writeText(generatedMessage);
   }
-
 </script>
 
 <tr>
-  <td>
+  <td class="truncate">
     {#if editing}
       <input class="edit-input" bind:value={editName} />
     {:else}
       {contact.name}
     {/if}
   </td>
-  <td>
+  <td class="truncate">
     {#if editing}
-      <input class="edit-input" bind:value={editCompany} placeholder="Company" />
+      <input
+        class="edit-input"
+        bind:value={editCompany}
+        placeholder="Company"
+      />
     {:else}
-      {contact.company ?? ''}
+      {contact.company ?? ""}
     {/if}
   </td>
   <td>
@@ -238,22 +261,33 @@
       {/each}
     </select>
   </td>
-  <td class:overdue={isOverdue(contact.follow_up_date)}>
+  <td class:overdue={isOverdue(contact.follow_up_date)} class="truncate">
     {#if editing}
       <input class="edit-input" type="date" bind:value={editFollowUp} />
     {:else}
-      {contact.follow_up_date ?? '-'}
+      {contact.follow_up_date ?? "-"}
     {/if}
   </td>
   <td class="center">{contact.conversations.length}</td>
   <td class="actions-cell">
-    <button class="outline btn-sm" onclick={() => expanded = !expanded}>{expanded ? '▲' : '▼'}</button>
+    <button class="outline btn-sm" onclick={() => (expanded = !expanded)}
+      >{expanded ? "▲" : "▼"}</button
+    >
     {#if editing}
-      <button class="outline btn-sm save-btn" onclick={saveMeta} title="Save">💾</button>
-      <button class="outline btn-sm" onclick={cancelEdit} title="Cancel">✕</button>
+      <button class="outline btn-sm save-btn" onclick={saveMeta} title="Save"
+        >💾</button
+      >
+      <button class="outline btn-sm" onclick={cancelEdit} title="Cancel"
+        >✕</button
+      >
     {:else}
-      <button class="outline btn-sm" onclick={startEdit} title="Edit">✏</button>
-      <button class="outline btn-sm danger-btn" onclick={deleteContact} title="Delete">✕</button>
+      <button class="outline btn-sm" onclick={startEdit} title="Edit">✏</button
+      >
+      <button
+        class="outline btn-sm danger-btn"
+        onclick={deleteContact}
+        title="Delete">✕</button
+      >
     {/if}
   </td>
 </tr>
@@ -262,20 +296,43 @@
   <tr class="expanded-row">
     <td colspan="6">
       <div class="expanded-content">
-
         <!-- Contact details -->
         {#if editing}
           <div class="detail-grid">
-            <label>Role <input class="edit-input" bind:value={editRole} placeholder="Role/Title" /></label>
-            <label>Follow-up <input class="edit-input" type="date" bind:value={editFollowUp} /></label>
-            <label class="full-width">Notes <textarea rows={2} bind:value={editNotes}></textarea></label>
+            <label
+              >Role <input
+                class="edit-input"
+                bind:value={editRole}
+                placeholder="Role/Title"
+              /></label
+            >
+            <label
+              >Follow-up <input
+                class="edit-input"
+                type="date"
+                bind:value={editFollowUp}
+              /></label
+            >
+            <label class="full-width"
+              >Notes <textarea class="mono" rows={2} bind:value={editNotes}
+              ></textarea></label
+            >
           </div>
         {:else}
           <div class="detail-row">
-            {#if contact.role}<span><strong>Role:</strong> {contact.role}</span>{/if}
-            {#if contact.email}<span><strong>Email:</strong> {contact.email}</span>{/if}
-            {#if contact.linkedin}<span><strong>LinkedIn:</strong> <a href={contact.linkedin} target="_blank">{contact.linkedin}</a></span>{/if}
-            {#if contact.source}<span><strong>Met:</strong> {contact.source}</span>{/if}
+            {#if contact.role}<span><strong>Role:</strong> {contact.role}</span
+              >{/if}
+            {#if contact.email}<span
+                ><strong>Email:</strong> {contact.email}</span
+              >{/if}
+            {#if contact.linkedin}<span
+                ><strong>LinkedIn:</strong>
+                <a href={contact.linkedin} target="_blank">{contact.linkedin}</a
+                ></span
+              >{/if}
+            {#if contact.source}<span
+                ><strong>Met:</strong> {contact.source}</span
+              >{/if}
           </div>
           {#if contact.notes}<p class="notes">{contact.notes}</p>{/if}
           {#if contact.tags && contact.tags.length > 0}
@@ -290,21 +347,37 @@
             {#each contact.linked_jobs ?? [] as job}
               <span class="tag job-tag">
                 {job}
-                <button class="tag-remove" onclick={() => removeLinkedJob(job)} title="Unlink">x</button>
+                <button
+                  class="tag-remove"
+                  onclick={() => removeLinkedJob(job)}
+                  title="Unlink">x</button
+                >
               </span>
             {/each}
-            <button class="outline btn-sm" onclick={() => { showJobPicker = !showJobPicker; jobSearchQuery = ''; }}>
-              {showJobPicker ? 'Cancel' : '+ Link Job'}
+            <button
+              class="outline btn-sm"
+              onclick={() => {
+                showJobPicker = !showJobPicker;
+                jobSearchQuery = "";
+              }}
+            >
+              {showJobPicker ? "Cancel" : "+ Link Job"}
             </button>
           </div>
           {#if showJobPicker}
             <div class="job-picker">
-              <input class="edit-input" bind:value={jobSearchQuery}
-                     placeholder="Search by company or role..." />
+              <input
+                class="edit-input"
+                bind:value={jobSearchQuery}
+                placeholder="Search by company or role..."
+              />
               {#if availableJobs.length > 0}
                 <div class="job-picker-list">
                   {#each availableJobs.slice(0, 8) as job}
-                    <button class="job-picker-item" onclick={() => addLinkedJob(job.dir)}>
+                    <button
+                      class="job-picker-item"
+                      onclick={() => addLinkedJob(job.dir)}
+                    >
                       <span class="job-picker-company">{job.company}</span>
                       <span class="job-picker-role">{job.role}</span>
                       <span class="job-picker-date">{job.date}</span>
@@ -322,8 +395,13 @@
         <div class="section">
           <div class="section-header">
             <h4>Conversations</h4>
-            <button class="outline btn-sm" onclick={() => { showNewConvForm = !showNewConvForm; }}>
-              {showNewConvForm ? 'Cancel' : '+ New Thread'}
+            <button
+              class="outline btn-sm"
+              onclick={() => {
+                showNewConvForm = !showNewConvForm;
+              }}
+            >
+              {showNewConvForm ? "Cancel" : "+ New Thread"}
             </button>
           </div>
 
@@ -337,11 +415,22 @@
                   {/each}
                 </select>
               </div>
-              <input bind:value={newConvSummary} placeholder="Summary (required)" />
+              <input
+                bind:value={newConvSummary}
+                placeholder="Summary (required)"
+              />
               <div class="form-sub-header">First message (optional)</div>
               <input bind:value={newConvMsgSender} placeholder="Sender name" />
-              <textarea rows={2} bind:value={newConvMsgContent} placeholder="Message content"></textarea>
-              <button onclick={createConversation} aria-busy={newConvSaving} disabled={!newConvSummary.trim() || newConvSaving}>
+              <textarea
+                rows={2}
+                bind:value={newConvMsgContent}
+                placeholder="Message content"
+              ></textarea>
+              <button
+                onclick={createConversation}
+                aria-busy={newConvSaving}
+                disabled={!newConvSummary.trim() || newConvSaving}
+              >
                 Create Thread
               </button>
             </div>
@@ -354,35 +443,77 @@
               {#each contact.conversations as conv, i}
                 <div class="conv-card">
                   <!-- Conversation header (always visible, clickable) -->
-                  <div class="conv-header" role="button" tabindex="0" onclick={() => toggleConv(i)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleConv(i); }}>
+                  <div
+                    class="conv-header"
+                    role="button"
+                    tabindex="0"
+                    onclick={() => toggleConv(i)}
+                    onkeydown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") toggleConv(i);
+                    }}
+                  >
                     <div class="conv-header-left">
-                      <span class="conv-toggle">{expandedConvs.has(i) ? '▾' : '▸'}</span>
+                      <span class="conv-toggle"
+                        >{expandedConvs.has(i) ? "▾" : "▸"}</span
+                      >
                       {#if editSummaryIdx === i}
                         <!-- svelte-ignore a11y_autofocus -->
-                        <input class="edit-input summary-edit" bind:value={editSummaryText}
+                        <input
+                          class="edit-input summary-edit"
+                          bind:value={editSummaryText}
                           onclick={(e) => e.stopPropagation()}
-                          onkeydown={(e) => { if (e.key === 'Enter') saveSummary(i); if (e.key === 'Escape') editSummaryIdx = null; }}
-                          autofocus />
+                          onkeydown={(e) => {
+                            if (e.key === "Enter") saveSummary(i);
+                            if (e.key === "Escape") editSummaryIdx = null;
+                          }}
+                          autofocus
+                        />
                       {:else}
                         <span class="conv-summary">{conv.summary}</span>
                       {/if}
                     </div>
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <div class="conv-header-right" onclick={(e) => e.stopPropagation()}>
-                      {#if conv.channel}<span class="conv-channel">{conv.channel}</span>{/if}
+                    <div
+                      class="conv-header-right"
+                      onclick={(e) => e.stopPropagation()}
+                    >
+                      {#if conv.channel}<span class="channel-badge"
+                          >{conv.channel}</span
+                        >{/if}
                       <span class="conv-meta">{conv.messages.length} msg</span>
                       <span class="conv-date">{conv.created}</span>
                       {#if editSummaryIdx === i}
-                        <button class="outline btn-sm save-btn" onclick={() => saveSummary(i)} title="Save">💾</button>
-                        <button class="outline btn-sm" onclick={() => editSummaryIdx = null} title="Cancel">✕</button>
+                        <button
+                          class="outline btn-sm save-btn"
+                          onclick={() => saveSummary(i)}
+                          title="Save">💾</button
+                        >
+                        <button
+                          class="outline btn-sm"
+                          onclick={() => (editSummaryIdx = null)}
+                          title="Cancel">✕</button
+                        >
                       {:else}
-                        <button class="outline btn-sm" onclick={() => startEditSummary(i, conv.summary)} title="Edit summary">✏</button>
+                        <button
+                          class="outline btn-sm"
+                          onclick={() => startEditSummary(i, conv.summary)}
+                          title="Edit summary">✏</button
+                        >
                         {#if conv.messages.length > 0}
-                          <button class="outline btn-sm" onclick={() => summarizeConv(i)}
-                            aria-busy={summarizing === i} disabled={summarizing === i} title="AI Summarize">✦</button>
+                          <button
+                            class="outline btn-sm"
+                            onclick={() => summarizeConv(i)}
+                            aria-busy={summarizing === i}
+                            disabled={summarizing === i}
+                            title="AI Summarize">✦</button
+                          >
                         {/if}
-                        <button class="outline btn-sm danger-btn" onclick={() => deleteConversation(i)} title="Delete thread">✕</button>
+                        <button
+                          class="outline btn-sm danger-btn"
+                          onclick={() => deleteConversation(i)}
+                          title="Delete thread">✕</button
+                        >
                       {/if}
                     </div>
                   </div>
@@ -398,7 +529,11 @@
                             <div class="msg-header">
                               <span class="msg-sender">{msg.sender}</span>
                               <span class="msg-date">{msg.date}</span>
-                              <button class="outline btn-xs danger-btn" onclick={() => deleteMessage(i, mi)} title="Delete">✕</button>
+                              <button
+                                class="outline btn-xs danger-btn"
+                                onclick={() => deleteMessage(i, mi)}
+                                title="Delete">✕</button
+                              >
                             </div>
                             <p class="msg-content">{msg.content}</p>
                           </div>
@@ -408,16 +543,39 @@
                       <!-- Add message form -->
                       {#if addMsgConvIdx === i}
                         <div class="add-msg-form">
-                          <input bind:value={addMsgSender} placeholder="Sender name (e.g. me, Jane)" />
-                          <textarea rows={2} bind:value={addMsgContent} placeholder="Message content"></textarea>
+                          <input
+                            bind:value={addMsgSender}
+                            placeholder="Sender name (e.g. me, Jane)"
+                          />
+                          <textarea
+                            rows={2}
+                            bind:value={addMsgContent}
+                            placeholder="Message content"
+                          ></textarea>
                           <div class="form-actions">
-                            <button onclick={() => addMessage(i)} aria-busy={addMsgSaving}
-                              disabled={!addMsgSender.trim() || !addMsgContent.trim() || addMsgSaving}>Add</button>
-                            <button class="outline" onclick={() => addMsgConvIdx = null}>Cancel</button>
+                            <button
+                              onclick={() => addMessage(i)}
+                              aria-busy={addMsgSaving}
+                              disabled={!addMsgSender.trim() ||
+                                !addMsgContent.trim() ||
+                                addMsgSaving}>Add</button
+                            >
+                            <button
+                              class="outline"
+                              onclick={() => (addMsgConvIdx = null)}
+                              >Cancel</button
+                            >
                           </div>
                         </div>
                       {:else}
-                        <button class="outline btn-sm" onclick={() => { addMsgConvIdx = i; addMsgSender = ''; addMsgContent = ''; }}>
+                        <button
+                          class="outline btn-sm"
+                          onclick={() => {
+                            addMsgConvIdx = i;
+                            addMsgSender = "";
+                            addMsgContent = "";
+                          }}
+                        >
                           + Add Message
                         </button>
                       {/if}
@@ -433,7 +591,12 @@
         <div class="section">
           <div class="section-header">
             <h4>AI Follow-up</h4>
-            <button class="outline btn-sm" onclick={generateFollowup} aria-busy={generating} disabled={generating}>
+            <button
+              class="outline btn-sm"
+              onclick={generateFollowup}
+              aria-busy={generating}
+              disabled={generating}
+            >
               Generate
             </button>
           </div>
@@ -444,80 +607,32 @@
 
           {#if generatedMessage}
             <div class="generated">
-              {#if generatedSubject}<p><strong>Subject:</strong> {generatedSubject}</p>{/if}
+              {#if generatedSubject}<p>
+                  <strong>Subject:</strong>
+                  {generatedSubject}
+                </p>{/if}
               <pre class="message-box">{generatedMessage}</pre>
               {#if generatedChannel || generatedTiming}
-                <p class="muted">Channel: {generatedChannel} · Timing: {generatedTiming}</p>
+                <p class="muted">
+                  Channel: {generatedChannel} · Timing: {generatedTiming}
+                </p>
               {/if}
-              <button class="outline btn-sm" onclick={copyToClipboard}>Copy</button>
+              <button class="outline btn-sm" onclick={copyToClipboard}
+                >Copy</button
+              >
             </div>
           {/if}
         </div>
-
       </div>
     </td>
   </tr>
 {/if}
 
 <style>
-  .actions-cell {
-    white-space: nowrap;
-    overflow: visible;
-  }
-
-  .btn-sm {
-    padding: 0.25em 0.45em;
-    margin-bottom: 0;
-  }
-
-  .btn-xs {
-    padding: 0.1em 0.3em;
-    margin-bottom: 0;
-    font-size: 0.7rem;
-  }
-
-  .danger-btn {
-    color: var(--pico-del-color);
-    border-color: var(--pico-del-color);
-  }
-
-  .save-btn {
-    color: var(--pico-ins-color);
-    border-color: var(--pico-ins-color);
-  }
-
-  .center {
-    text-align: center;
-  }
-
+  /* Component-specific styles only - shared styles moved to app.css */
   .overdue {
     color: var(--pico-del-color);
     font-weight: 600;
-  }
-
-  td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  select {
-    margin-bottom: 0;
-    padding: 0.2em 0.4em;
-    width: 100%;
-    font-size: inherit;
-  }
-
-  .edit-input {
-    width: 100%;
-    padding: 0.2rem 0.4rem;
-    margin-bottom: 0;
-    font-size: 0.875rem;
-  }
-
-  .expanded-row td {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--pico-muted-border-color);
   }
 
   .expanded-content {
@@ -549,24 +664,10 @@
     margin: 0;
   }
 
-  .muted {
-    color: var(--pico-muted-color);
-    font-size: 0.85rem;
-    margin: 0;
-  }
-
   .tags {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
-  }
-
-  .tag {
-    background: var(--pico-secondary-background);
-    color: var(--pico-secondary);
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.78rem;
   }
 
   .job-tag {
@@ -580,23 +681,6 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     font-size: 0.85rem;
-  }
-
-  .section {
-    border-top: 1px solid var(--pico-muted-border-color);
-    padding-top: 0.75rem;
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-
-  .section-header h4 {
-    margin: 0;
-    font-size: 0.9rem;
   }
 
   .log-form {
@@ -659,7 +743,11 @@
   }
 
   .conv-header:hover {
-    background: color-mix(in srgb, var(--pico-muted-border-color) 20%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--pico-muted-border-color) 20%,
+      transparent
+    );
   }
 
   .conv-header-left {
@@ -693,14 +781,6 @@
     align-items: center;
     gap: 0.4rem;
     flex-shrink: 0;
-  }
-
-  .conv-channel {
-    font-size: 0.72rem;
-    background: var(--pico-primary-background);
-    color: var(--pico-primary);
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
   }
 
   .conv-meta {
@@ -787,36 +867,7 @@
     gap: 0.5rem;
   }
 
-  .message-box {
-    white-space: pre-wrap;
-    font-family: inherit;
-    font-size: 0.85rem;
-    background: var(--pico-card-background-color);
-    border: 1px solid var(--pico-muted-border-color);
-    border-radius: 4px;
-    padding: 0.75rem;
-    margin: 0;
-  }
-
-  .error {
-    color: var(--pico-del-color);
-    font-size: 0.85rem;
-  }
-
   /* Job linking */
-  .tag-remove {
-    all: unset;
-    cursor: pointer;
-    margin-left: 0.25rem;
-    font-size: 0.65rem;
-    color: var(--pico-del-color);
-    opacity: 0.6;
-  }
-
-  .tag-remove:hover {
-    opacity: 1;
-  }
-
   .job-picker {
     display: flex;
     flex-direction: column;

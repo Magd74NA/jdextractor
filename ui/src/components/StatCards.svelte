@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DashboardStats } from '../lib/dashboard';
+  import type { DashboardStats } from "../lib/dashboard";
 
   let { stats }: { stats: DashboardStats } = $props();
 </script>
@@ -22,31 +22,3 @@
     <small>This Week</small>
   </article>
 </div>
-
-<style>
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-
-  .stat-card {
-    text-align: center;
-    padding: 1rem;
-    margin-bottom: 0;
-  }
-
-  .stat-card h3 {
-    margin-bottom: 0.25rem;
-    color: var(--pico-primary);
-    font-size: 2rem;
-  }
-
-  .stat-card small {
-    color: var(--pico-muted-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.75rem;
-  }
-</style>

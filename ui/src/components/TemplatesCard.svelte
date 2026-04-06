@@ -50,7 +50,7 @@
           <button class="outline" onclick={saveResume}>Save</button>
         </div>
       </div>
-      <textarea rows={8} bind:value={resume}></textarea>
+      <textarea class="mono" rows={8} bind:value={resume}></textarea>
     </div>
 
     <div class="file-section">
@@ -61,50 +61,14 @@
           <button class="outline" onclick={saveCover}>Save</button>
         </div>
       </div>
-      <textarea rows={8} bind:value={cover}></textarea>
+      <textarea class="mono" rows={8} bind:value={cover}></textarea>
     </div>
   {/if}
 </section>
 
 <style>
-  .file-section {
-    margin-bottom: 1.5rem;
-  }
-
-  .file-section:last-child {
-    margin-bottom: 0;
-  }
-
-  .file-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-
-  .file-header h4 {
-    margin: 0;
-    font-size: 1rem;
-  }
-
-  .file-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
   .file-actions button {
     padding: 0.25rem 0.5rem;
     margin-bottom: 0;
-  }
-
-  textarea {
-    font-family: monospace;
-    font-size: 0.85rem;
-    margin-bottom: 0;
-  }
-
-  .success {
-    color: var(--pico-ins-color);
   }
 </style>

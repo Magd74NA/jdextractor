@@ -1,3 +1,4 @@
+/* === Layout === */
 body {
   max-width: 1400px;
   margin: 0 auto;
@@ -21,7 +22,45 @@ a.active {
   margin-bottom: 0;
 }
 
-/* Tighten buttons */
+/* === Tables === */
+.table-wrap {
+  overflow-x: clip;
+}
+
+.table-wrap table {
+  table-layout: fixed;
+  width: 100%;
+  font-size: 0.72rem;
+}
+
+.table-wrap thead th {
+  white-space: nowrap;
+}
+
+.table-wrap select {
+  margin-bottom: 0;
+  padding: 0.2em 0.4em;
+  width: 100%;
+  font-size: inherit;
+}
+
+.expanded-row td {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+
+.actions-cell {
+  white-space: nowrap;
+  overflow: visible;
+}
+
+td.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === Buttons === */
 button {
   width: auto;
 }
@@ -30,11 +69,207 @@ button {
   padding: 0.4rem 0.75rem;
 }
 
-/* Status messages */
+.btn-sm {
+  padding: 0.25em 0.45em;
+  margin-bottom: 0;
+}
+
+.btn-xs {
+  padding: 0.1em 0.3em;
+  margin-bottom: 0;
+  font-size: 0.7rem;
+}
+
+.danger-btn {
+  color: var(--pico-del-color);
+  border-color: var(--pico-del-color);
+}
+
+.save-btn {
+  color: var(--pico-ins-color);
+  border-color: var(--pico-ins-color);
+}
+
+/* === Forms === */
+.edit-input {
+  width: 100%;
+  padding: 0.2rem 0.4rem;
+  margin-bottom: 0;
+  font-size: 0.875rem;
+}
+
+textarea.mono {
+  font-family: monospace;
+  font-size: 0.85rem;
+  margin-bottom: 0;
+}
+
+/* === Typography & Status === */
+.error {
+  color: var(--pico-del-color);
+}
+
+.success {
+  color: var(--pico-ins-color);
+}
+
 small.success {
   color: var(--pico-ins-color);
 }
 
 small.error {
   color: var(--pico-del-color);
+}
+
+.muted {
+  color: var(--pico-muted-color);
+  font-size: 0.85rem;
+}
+
+.center {
+  text-align: center;
+}
+
+/* === Cards & Sections === */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 1rem;
+  margin-bottom: 0;
+}
+
+.stat-card h3 {
+  margin-bottom: 0.25rem;
+  color: var(--pico-primary);
+  font-size: 2rem;
+}
+
+.stat-card small {
+  color: var(--pico-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+}
+
+.file-section {
+  margin-bottom: 1.5rem;
+}
+
+.file-section:last-child {
+  margin-bottom: 0;
+}
+
+.file-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.file-header h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section {
+  border-top: 1px solid var(--pico-muted-border-color);
+  padding-top: 0.75rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.section-header h4 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* === Tags & Badges === */
+:root {
+  --badge-good-bg: #bbf7d0;
+  --badge-good-fg: #166534;
+  --badge-ok-bg: #fef08a;
+  --badge-ok-fg: #854d0e;
+  --badge-low-bg: #fecaca;
+  --badge-low-fg: #991b1b;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.badge-good {
+  background: var(--badge-good-bg);
+  color: var(--badge-good-fg);
+}
+
+.badge-ok {
+  background: var(--badge-ok-bg);
+  color: var(--badge-ok-fg);
+}
+
+.badge-low {
+  background: var(--badge-low-bg);
+  color: var(--badge-low-fg);
+}
+
+.tag {
+  background: var(--pico-secondary-background);
+  color: var(--pico-secondary);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+
+.tag-remove {
+  all: unset;
+  cursor: pointer;
+  font-size: 0.65rem;
+  color: var(--pico-del-color);
+  opacity: 0.6;
+  margin-left: 0.25rem;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+}
+
+.channel-badge {
+  font-size: 0.68rem;
+  background: var(--pico-primary-background);
+  color: var(--pico-primary);
+  padding: 0.08rem 0.3rem;
+  border-radius: 3px;
+}
+
+/* === Message Display === */
+.message-box {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0;
 }

@@ -146,7 +146,7 @@
 
   <label>
     <h4>System Prompt</h4>
-    <textarea rows={4} bind:value={systemPrompt}></textarea>
+    <textarea class="mono" rows={4} bind:value={systemPrompt}></textarea>
   </label>
 
   <label>

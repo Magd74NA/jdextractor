@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { getContacts, loadContacts } from '../lib/stores.svelte';
-  import ContactRow from './ContactRow.svelte';
+  import { getContacts, loadContacts } from "../lib/stores.svelte";
+  import ContactRow from "./ContactRow.svelte";
 
   let loading = $state(true);
-  let error = $state('');
+  let error = $state("");
   let contacts = $derived(getContacts());
 
   async function init() {
     try {
       await loadContacts();
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load contacts';
+      error = e instanceof Error ? e.message : "Failed to load contacts";
     } finally {
       loading = false;
     }
@@ -48,20 +48,7 @@
 {/if}
 
 <style>
-  .table-wrap {
-    overflow-x: clip;
-  }
-
-  table {
-    table-layout: fixed;
-    width: 100%;
-    font-size: 0.72rem;
-  }
-
-  thead th {
-    white-space: nowrap;
-  }
-
+  /* Component-specific styles only - shared styles moved to app.css */
   .col-name {
     width: 18%;
   }
@@ -85,9 +72,5 @@
 
   .col-actions {
     width: 9.5em;
-  }
-
-  .error {
-    color: var(--pico-del-color);
   }
 </style>
