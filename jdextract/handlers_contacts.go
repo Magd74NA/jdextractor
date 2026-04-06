@@ -323,8 +323,8 @@ func (a *App) handleSendFollowup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Content        string `json:"content"`
-		Channel        string `json:"channel"`
+		Content          string `json:"content"`
+		Channel          string `json:"channel"`
 		NextFollowUpDate string `json:"next_followup_date"`
 	}
 	if !decodeBody(w, r, &body) {
@@ -339,8 +339,8 @@ func (a *App) handleSendFollowup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updated, err := SendFollowup(a, id, SendFollowupInput{
-		Content:        body.Content,
-		Channel:        body.Channel,
+		Content:          body.Content,
+		Channel:          body.Channel,
 		NextFollowUpDate: body.NextFollowUpDate,
 	})
 	if err != nil {

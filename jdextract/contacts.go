@@ -30,7 +30,7 @@ type ContactMeta struct {
 
 // Message is a single message within a conversation thread.
 type Message struct {
-	Sender    string `json:"sender"`              // freeform name: "me", "Jane Doe", etc.
+	Sender    string `json:"sender"` // freeform name: "me", "Jane Doe", etc.
 	Content   string `json:"content"`
 	Date      string `json:"date"`                // YYYY-MM-DD
 	Generated bool   `json:"generated,omitempty"` // true if AI-drafted
@@ -327,8 +327,8 @@ var validFollowupChannels = []string{"email", "linkedin", "phone", "in-person", 
 
 // SendFollowupInput holds the parameters for SendFollowup.
 type SendFollowupInput struct {
-	Content        string // required
-	Channel        string // required; one of validFollowupChannels
+	Content          string // required
+	Channel          string // required; one of validFollowupChannels
 	NextFollowUpDate string // optional; YYYY-MM-DD or ""
 }
 

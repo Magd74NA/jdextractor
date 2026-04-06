@@ -8,6 +8,7 @@
     Message,
   } from "../lib/types";
   import { CONTACT_STATUSES, CHANNELS } from "../lib/types";
+  import FollowupPanel from "./FollowupPanel.svelte";
 
   let allJobs = $derived(getJobs());
   let showJobPicker = $state(false);
@@ -25,16 +26,6 @@
   let { contact }: { contact: Contact } = $props();
 
   let expanded = $state(false);
-  let generating = $state(false);
-  let generatedMessage = $state("");
-  let generatedSubject = $state("");
-  let generatedChannel = $state("");
-  let generatedTiming = $state("");
-  let generatedNextDate = $state("");
-  let generateError = $state("");
-  let sending = $state(false);
-  let sendError = $state("");
-  let sendSuccess = $state(false);
 
   let editing = $state(false);
   let editName = $state("");
@@ -189,60 +180,6 @@
     }
   }
 
-  async function generateFollowup() {
-    generating = true;
-    generatedMessage = "";
-    generatedSubject = "";
-    generatedChannel = "";
-    generatedTiming = "";
-    generatedNextDate = "";
-    generateError = "";
-    sendError = "";
-    sendSuccess = false;
-    try {
-      const result = await api.generateFollowupStream(contact.dir, (event) => {
-        if (event.stage === "content" && event.delta) {
-          generatedMessage += event.delta;
-        }
-      });
-      generatedMessage = result.message;
-      generatedSubject = result.subject ?? "";
-      generatedChannel = result.channel ?? "";
-      generatedTiming = result.timing ?? "";
-      generatedNextDate = result.suggested_next_date ?? "";
-    } catch (e) {
-      generateError = e instanceof Error ? e.message : "Generation failed";
-    } finally {
-      generating = false;
-    }
-  }
-
-  async function markAsSent() {
-    if (!generatedMessage.trim() || !generatedChannel) return;
-    sending = true;
-    sendError = "";
-    try {
-      const sendBody: { content: string; channel: string; next_followup_date?: string } = {
-        content: generatedMessage,
-        channel: generatedChannel,
-      };
-      if (generatedNextDate) sendBody.next_followup_date = generatedNextDate;
-      await api.sendFollowup(contact.dir, sendBody);
-      sendSuccess = true;
-      // Reset panel
-      generatedMessage = "";
-      generatedSubject = "";
-      generatedChannel = "";
-      generatedTiming = "";
-      generatedNextDate = "";
-      await refreshContacts();
-    } catch (e) {
-      sendError = e instanceof Error ? e.message : "Failed to mark as sent";
-    } finally {
-      sending = false;
-    }
-  }
-
   async function addLinkedJob(jobDir: string) {
     const current = contact.linked_jobs ?? [];
     await api.updateContact(contact.dir, { linked_jobs: [...current, jobDir] });
@@ -264,9 +201,6 @@
     return dateStr <= new Date().toISOString().slice(0, 10);
   }
 
-  function copyToClipboard() {
-    navigator.clipboard.writeText(generatedMessage);
-  }
 </script>
 
 <tr>
@@ -623,62 +557,8 @@
 
         <!-- Follow-up generator -->
         <div class="section">
-          <div class="section-header">
-            <h4>AI Follow-up</h4>
-            <button
-              class="outline btn-sm"
-              onclick={generateFollowup}
-              aria-busy={generating}
-              disabled={generating}
-            >
-              Generate
-            </button>
-          </div>
-
-          {#if generateError}
-            <p class="error">{generateError}</p>
-          {/if}
-
-          {#if sendSuccess}
-            <p class="send-success">Logged. {generatedNextDate ? `Next follow-up: ${generatedNextDate}` : "Follow-up date cleared."}</p>
-          {/if}
-
-          {#if generatedMessage || generating}
-            <div class="generated">
-              {#if generatedSubject}
-                <p class="gen-meta"><strong>Subject:</strong> {generatedSubject}</p>
-              {/if}
-              {#if generatedChannel || generatedTiming}
-                <p class="muted">Channel: {generatedChannel} · Timing: {generatedTiming}</p>
-              {/if}
-              <!-- svelte-ignore a11y_autofocus -->
-              <textarea
-                class="mono"
-                rows={6}
-                bind:value={generatedMessage}
-                disabled={generating}
-                autofocus={!generating}
-              ></textarea>
-              <div class="send-row">
-                <label class="send-date-label">
-                  Next follow-up
-                  <input type="date" bind:value={generatedNextDate} class="edit-input" />
-                </label>
-                <div class="send-actions">
-                  <button class="outline btn-sm" onclick={copyToClipboard} disabled={generating}>Copy</button>
-                  <button
-                    class="btn-sm"
-                    onclick={markAsSent}
-                    aria-busy={sending}
-                    disabled={generating || sending || !generatedMessage.trim()}
-                  >Mark as Sent</button>
-                </div>
-              </div>
-              {#if sendError}
-                <p class="error">{sendError}</p>
-              {/if}
-            </div>
-          {/if}
+          <h4>AI Follow-up</h4>
+          <FollowupPanel contact={contact} onSent={refreshContacts} />
         </div>
 
         <!-- Contact timeline -->
@@ -940,50 +820,6 @@
     margin-bottom: 0;
     font-size: 0.82rem;
     padding: 0.25em 0.6em;
-  }
-
-  /* Follow-up generator */
-  .generated {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .gen-meta {
-    font-size: 0.82rem;
-    margin: 0;
-  }
-
-  .send-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .send-date-label {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    flex: 1;
-  }
-
-  .send-date-label input {
-    margin: 0;
-    font-size: 0.82rem;
-  }
-
-  .send-actions {
-    display: flex;
-    gap: 0.4rem;
-    flex-shrink: 0;
-  }
-
-  .send-success {
-    font-size: 0.82rem;
-    color: var(--pico-ins-color);
-    margin: 0;
   }
 
   /* Timeline */
