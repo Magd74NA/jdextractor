@@ -92,13 +92,15 @@
     generatedTiming = '';
     generateError = '';
     try {
-      const fullMessage = await api.generateFollowupStream(contact.dir, (event) => {
+      const result = await api.generateFollowupStream(contact.dir, (event) => {
         if (event.stage === 'content' && event.delta) {
           generatedMessage += event.delta;
         }
       });
-      // Server sends the final assembled message in the complete event
-      if (fullMessage) generatedMessage = fullMessage;
+      generatedMessage = result.message;
+      generatedSubject = result.subject ?? '';
+      generatedChannel = result.channel ?? '';
+      generatedTiming = result.timing ?? '';
     } catch (e) {
       generateError = e instanceof Error ? e.message : 'Generation failed';
     } finally {

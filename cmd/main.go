@@ -494,6 +494,16 @@ func cmdContactsFollowup(args []string) {
 		os.Exit(1)
 	}
 	app := initAppWithConfig()
+
+	// Load networking prompt config (same pattern as server.go).
+	npPath := filepath.Join(app.Paths.Config, "networking_prompt.json")
+	if app.NetworkingPromptConfig.SystemPrompt == "" && app.NetworkingPromptConfig.TaskList == "" {
+		if f, err := os.Open(npPath); err == nil {
+			if cfg, err := jdextract.LoadNetworkingPromptConfig(f); err == nil {
+				app.NetworkingPromptConfig = *cfg
+			}
+		}
+	}
 	dir, err := jdextract.FindContactByPrefix(app, args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)

@@ -53,9 +53,9 @@ export const api = {
   deleteConversation: (id: string, index: number) =>
     request<null>('DELETE', `/contacts/${id}/conversations/${index}`),
   generateFollowup: (id: string) => request<FollowupResult>('POST', `/contacts/${id}/followup`),
-  generateFollowupStream: async (id: string, onProgress: (event: ProgressEvent) => void): Promise<string> => {
+  generateFollowupStream: async (id: string, onProgress: (event: ProgressEvent) => void): Promise<FollowupResult> => {
     const final = await consumeSSERaw(`${BASE}/contacts/${id}/followup/stream`, {}, onProgress);
-    return final.message ?? '';
+    return JSON.parse(final.message ?? '{}') as FollowupResult;
   },
   getOverdueFollowups: () => request<Contact[]>('GET', '/contacts/overdue'),
   getUpcomingFollowups: (days?: number) =>

@@ -1,6 +1,7 @@
 package jdextract
 
 import (
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -208,9 +209,9 @@ func (a *App) handleGenerateFollowupStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Encode result as JSON and send in the dir field (reusing ProgressEvent.Dir for result payload)
-	// We send a final event with the full result encoded in message.
-	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Message: result.Message})
+	// JSON-encode the full result into Message so the frontend can parse all fields.
+	resultJSON, _ := json.Marshal(result)
+	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Message: string(resultJSON)})
 }
 
 func contactsToResponses(contacts []ContactMeta) []contactResponse {
