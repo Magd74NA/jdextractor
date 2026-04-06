@@ -1,10 +1,14 @@
 <script lang="ts">
   import { getJobs, loadJobs, loadContacts } from "../lib/stores.svelte";
   import JobRow from "./JobRow.svelte";
+  import type { Job } from "../lib/types";
+
+  let { jobs: jobsProp }: { jobs?: Job[] } = $props();
 
   let loading = $state(true);
   let error = $state("");
-  let jobs = $derived(getJobs());
+  let allJobs = $derived(getJobs());
+  let jobs = $derived(jobsProp ?? allJobs);
 
   async function init() {
     try {

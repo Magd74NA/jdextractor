@@ -27,6 +27,7 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/templates", a.handleSaveTemplates)
 	mux.HandleFunc("GET /api/jobs/{id}/files", a.handleGetJobFiles)
 	mux.HandleFunc("PATCH /api/jobs/{id}/files", a.handleSaveJobFiles)
+	mux.HandleFunc("GET /api/search", a.handleSearch)
 	mux.HandleFunc("GET /api/jobs", a.handleListJobs)
 	mux.HandleFunc("PATCH /api/jobs/{id}", a.handleUpdateJobStatus)
 	mux.HandleFunc("DELETE /api/jobs/{id}", a.handleDeleteJob)
@@ -282,18 +283,65 @@ type jobResponse struct {
 	Dir string `json:"dir"`
 }
 
-// handleListJobs returns all processed job applications as a JSON array.
+// handleListJobs returns all processed job applications as a JSON array,
+// filtered by any query parameters present in the request.
 func (a *App) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	jobs, err := ListJobs(a)
 	if err != nil {
 		http.Error(w, "failed to list jobs", http.StatusInternalServerError)
 		return
 	}
+	jobs = applyJobFilters(jobs, r)
 	out := make([]jobResponse, len(jobs))
 	for i, j := range jobs {
 		out[i] = jobResponse{ApplicationMeta: j, Dir: j.Dir}
 	}
 	writeJSON(w, out)
+}
+
+// handleSearch performs a unified full-text search across jobs and contacts.
+// Query parameters:
+//   - q:    substring to match (see applyJobFilters / applyContactFilters)
+//   - type: "jobs", "contacts", or "all" (default)
+func (a *App) handleSearch(w http.ResponseWriter, r *http.Request) {
+	typ := r.URL.Query().Get("type")
+	if typ == "" {
+		typ = "all"
+	}
+
+	type searchResponse struct {
+		Jobs     []jobResponse     `json:"jobs,omitempty"`
+		Contacts []contactResponse `json:"contacts,omitempty"`
+	}
+	var resp searchResponse
+
+	if typ == "all" || typ == "jobs" {
+		jobs, err := ListJobs(a)
+		if err != nil {
+			http.Error(w, "list jobs: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		jobs = applyJobFilters(jobs, r)
+		resp.Jobs = make([]jobResponse, len(jobs))
+		for i, j := range jobs {
+			resp.Jobs[i] = jobResponse{ApplicationMeta: j, Dir: j.Dir}
+		}
+	}
+
+	if typ == "all" || typ == "contacts" {
+		contacts, err := ListContacts(a)
+		if err != nil {
+			http.Error(w, "list contacts: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		contacts = applyContactFilters(contacts, r)
+		resp.Contacts = make([]contactResponse, len(contacts))
+		for i, c := range contacts {
+			resp.Contacts[i] = contactResponse{ContactMeta: c, Dir: c.Dir}
+		}
+	}
+
+	writeJSON(w, resp)
 }
 
 // handleUpdateJobStatus decodes a partial job update and applies it to meta.json.

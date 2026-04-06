@@ -1,10 +1,14 @@
 <script lang="ts">
   import { getContacts, loadContacts } from "../lib/stores.svelte";
   import ContactRow from "./ContactRow.svelte";
+  import type { Contact } from "../lib/types";
+
+  let { contacts: contactsProp }: { contacts?: Contact[] } = $props();
 
   let loading = $state(true);
   let error = $state("");
-  let contacts = $derived(getContacts());
+  let allContacts = $derived(getContacts());
+  let contacts = $derived(contactsProp ?? allContacts);
 
   async function init() {
     try {

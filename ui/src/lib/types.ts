@@ -106,3 +106,8 @@ export const CONTACT_STATUSES: ContactStatus[] = [
 ];
 
 export const CHANNELS = ['email', 'linkedin', 'phone', 'in-person', 'event', 'other'] as const;
+
+export interface SearchResult {
+  jobs?: Job[];
+  contacts?: Contact[];
+}

@@ -1,4 +1,4 @@
-import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult, ProgressEvent, Contact, Conversation, Message, FollowupResult, NetworkingPromptConfig } from './types';
+import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult, ProgressEvent, Contact, Conversation, Message, FollowupResult, NetworkingPromptConfig, SearchResult } from './types';
 
 const BASE = '/api';
 
@@ -70,6 +70,9 @@ export const api = {
   getOverdueFollowups: () => request<Contact[]>('GET', '/contacts/overdue'),
   getUpcomingFollowups: (days?: number) =>
     request<Contact[]>('GET', `/contacts/upcoming${days !== undefined ? `?days=${days}` : ''}`),
+
+  searchAll: (q: string, type: 'all' | 'jobs' | 'contacts' = 'all') =>
+    request<SearchResult>('GET', `/search?q=${encodeURIComponent(q)}&type=${type}`),
 
   // Networking prompt config
   getNetworkingPromptConfig: () => request<NetworkingPromptConfig>('GET', '/config/networking-prompt'),

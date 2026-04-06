@@ -15,13 +15,15 @@ type contactResponse struct {
 	Dir string `json:"dir"`
 }
 
-// handleListContacts returns all contacts as JSON.
+// handleListContacts returns all contacts as JSON,
+// filtered by any query parameters present in the request.
 func (a *App) handleListContacts(w http.ResponseWriter, r *http.Request) {
 	contacts, err := ListContacts(a)
 	if err != nil {
 		http.Error(w, "list contacts: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	contacts = applyContactFilters(contacts, r)
 	out := make([]contactResponse, len(contacts))
 	for i, c := range contacts {
 		out[i] = contactResponse{ContactMeta: c, Dir: c.Dir}
