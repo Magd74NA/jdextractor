@@ -47,7 +47,7 @@ func SummarizeConversation(
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Summarize the following conversation thread in 1-2 sentences. Be concise and capture the key points.\n\n")
 	for _, msg := range conv.Messages {
-		fmt.Fprintf(&sb, "[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content)
+		fmt.Fprintf(&sb, "[%s] %s: %s\n", msg.Date, msg.Sender, Sanitize(msg.Content))
 	}
 
 	reqBody := deepseekRequest{
@@ -105,7 +105,7 @@ func GenerateFollowup(
 	}
 	fmt.Fprintf(&sb, "Relationship status: %s\n", contact.Status)
 	if contact.Notes != "" {
-		fmt.Fprintf(&sb, "Notes: %s\n", contact.Notes)
+		fmt.Fprintf(&sb, "Notes: %s\n", Sanitize(contact.Notes))
 	}
 	if len(contact.Tags) > 0 {
 		fmt.Fprintf(&sb, "Tags: %s\n", strings.Join(contact.Tags, ", "))
@@ -121,7 +121,7 @@ func GenerateFollowup(
 			if channel == "" {
 				channel = "unknown"
 			}
-			fmt.Fprintf(&sb, "Thread %d (%s): %s\n", i+1, channel, conv.Summary)
+			fmt.Fprintf(&sb, "Thread %d (%s): %s\n", i+1, channel, Sanitize(conv.Summary))
 		}
 
 		// Include last 5 messages from the most recent conversation for full context
@@ -133,7 +133,7 @@ func GenerateFollowup(
 				start = len(latest.Messages) - 5
 			}
 			for _, msg := range latest.Messages[start:] {
-				fmt.Fprintf(&sb, "[%s] %s: %s\n", msg.Date, msg.Sender, msg.Content)
+				fmt.Fprintf(&sb, "[%s] %s: %s\n", msg.Date, msg.Sender, Sanitize(msg.Content))
 			}
 		}
 	}
