@@ -47,8 +47,14 @@
 {:else if error}
   <p class="error">{error}</p>
 {:else}
+  <h3 class="section-title">Job Applications</h3>
   <StatCards {stats} />
-
+  {#if contacts.length > 0}
+    <hr />
+    <h3 class="section-title">Networking</h3>
+    <NetworkingStats stats={networkingStats} />
+    <FollowupQueue />
+  {/if}
   <section class="chart-section">
     <ActivityChart {jobs} />
   </section>
@@ -60,13 +66,6 @@
   <section class="chart-section">
     <ScoreChart {jobs} />
   </section>
-
-  {#if contacts.length > 0}
-    <hr />
-    <h3 class="section-title">Networking</h3>
-    <NetworkingStats stats={networkingStats} />
-    <FollowupQueue />
-  {/if}
 {/if}
 
 <style>
