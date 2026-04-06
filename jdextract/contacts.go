@@ -15,26 +15,26 @@ import (
 
 // ContactMeta is the persisted metadata for a networking contact.
 type ContactMeta struct {
-	Name          string              `json:"name"`
-	Company       string              `json:"company,omitempty"`
-	Role          string              `json:"role,omitempty"`
-	Email         string              `json:"email,omitempty"`
-	Phone         string              `json:"phone,omitempty"`
-	LinkedIn      string              `json:"linkedin,omitempty"`
-	Source        string              `json:"source,omitempty"`         // how met: event, referral, cold outreach, etc.
-	Status        string              `json:"status"`                   // relationship stage
-	FollowUpDate  string              `json:"follow_up_date,omitempty"` // YYYY-MM-DD
-	LinkedJobs    []string            `json:"linked_jobs,omitempty"`    // job directory names
-	Tags          []string            `json:"tags,omitempty"`           // freeform: recruiter, engineer, etc.
-	Notes         string              `json:"notes,omitempty"`
+	Name          string         `json:"name"`
+	Company       string         `json:"company,omitempty"`
+	Role          string         `json:"role,omitempty"`
+	Email         string         `json:"email,omitempty"`
+	Phone         string         `json:"phone,omitempty"`
+	LinkedIn      string         `json:"linkedin,omitempty"`
+	Source        string         `json:"source,omitempty"`         // how met: event, referral, cold outreach, etc.
+	Status        string         `json:"status"`                   // relationship stage
+	FollowUpDate  string         `json:"follow_up_date,omitempty"` // YYYY-MM-DD
+	LinkedJobs    []string       `json:"linked_jobs,omitempty"`    // job directory names
+	Tags          []string       `json:"tags,omitempty"`           // freeform: recruiter, engineer, etc.
+	Notes         string         `json:"notes,omitempty"`
 	Conversations []Conversation `json:"conversations"`
-	Created       string              `json:"created"` // YYYY-MM-DD
-	Dir           string              `json:"-"`       // populated at read time, excluded from JSON
+	Created       string         `json:"created"` // YYYY-MM-DD
+	Dir           string         `json:"-"`       // populated at read time, excluded from JSON
 }
 
 // Message is a single message within a conversation thread.
 type Message struct {
-	Sender  string `json:"sender"`  // freeform name: "me", "Jane Doe", etc.
+	Sender  string `json:"sender"` // freeform name: "me", "Jane Doe", etc.
 	Content string `json:"content"`
 	Date    string `json:"date"` // YYYY-MM-DD
 }
