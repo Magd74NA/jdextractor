@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getJobs, loadJobs } from '../lib/stores.svelte';
+  import { getJobs, loadJobs, loadContacts } from '../lib/stores.svelte';
   import JobRow from './JobRow.svelte';
 
   let loading = $state(true);
@@ -8,7 +8,7 @@
 
   async function init() {
     try {
-      await loadJobs();
+      await Promise.all([loadJobs(), loadContacts()]);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load jobs';
     } finally {

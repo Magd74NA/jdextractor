@@ -6,6 +6,7 @@
   import ScoreChart from '../components/ScoreChart.svelte';
   import StatusBar from '../components/StatusBar.svelte';
   import NetworkingStats from '../components/NetworkingStats.svelte';
+  import FollowupQueue from '../components/FollowupQueue.svelte';
 
   let loading = $state(true);
   let error = $state('');
@@ -55,6 +56,7 @@
     <hr />
     <h3 class="section-title">Networking</h3>
     <NetworkingStats stats={networkingStats} />
+    <FollowupQueue />
   {/if}
 {/if}
 

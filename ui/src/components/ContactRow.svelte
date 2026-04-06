@@ -1,8 +1,20 @@
 <script lang="ts">
   import { api } from '../lib/api';
-  import { refreshContacts } from '../lib/stores.svelte';
+  import { refreshContacts, getJobs } from '../lib/stores.svelte';
   import type { Contact, ContactStatus, Conversation, Message } from '../lib/types';
   import { CONTACT_STATUSES, CHANNELS } from '../lib/types';
+
+  let allJobs = $derived(getJobs());
+  let showJobPicker = $state(false);
+  let jobSearchQuery = $state('');
+  let availableJobs = $derived(
+    allJobs.filter(j =>
+      !(contact.linked_jobs ?? []).includes(j.dir) &&
+      (jobSearchQuery === '' ||
+       j.company.toLowerCase().includes(jobSearchQuery.toLowerCase()) ||
+       j.role.toLowerCase().includes(jobSearchQuery.toLowerCase()))
+    )
+  );
 
   let { contact }: { contact: Contact } = $props();
 
@@ -179,6 +191,20 @@
     }
   }
 
+  async function addLinkedJob(jobDir: string) {
+    const current = contact.linked_jobs ?? [];
+    await api.updateContact(contact.dir, { linked_jobs: [...current, jobDir] });
+    jobSearchQuery = '';
+    showJobPicker = false;
+    await refreshContacts();
+  }
+
+  async function removeLinkedJob(jobDir: string) {
+    const current = contact.linked_jobs ?? [];
+    await api.updateContact(contact.dir, { linked_jobs: current.filter(j => j !== jobDir) });
+    await refreshContacts();
+  }
+
   function isOverdue(dateStr?: string): boolean {
     if (!dateStr) return false;
     return dateStr <= new Date().toISOString().slice(0, 10);
@@ -259,12 +285,35 @@
               {/each}
             </div>
           {/if}
-          {#if contact.linked_jobs && contact.linked_jobs.length > 0}
-            <div class="linked-jobs">
-              <strong>Linked jobs:</strong>
-              {#each contact.linked_jobs as job}
-                <span class="tag job-tag">{job}</span>
-              {/each}
+          <div class="linked-jobs">
+            <strong>Linked jobs:</strong>
+            {#each contact.linked_jobs ?? [] as job}
+              <span class="tag job-tag">
+                {job}
+                <button class="tag-remove" onclick={() => removeLinkedJob(job)} title="Unlink">x</button>
+              </span>
+            {/each}
+            <button class="outline btn-sm" onclick={() => { showJobPicker = !showJobPicker; jobSearchQuery = ''; }}>
+              {showJobPicker ? 'Cancel' : '+ Link Job'}
+            </button>
+          </div>
+          {#if showJobPicker}
+            <div class="job-picker">
+              <input class="edit-input" bind:value={jobSearchQuery}
+                     placeholder="Search by company or role..." />
+              {#if availableJobs.length > 0}
+                <div class="job-picker-list">
+                  {#each availableJobs.slice(0, 8) as job}
+                    <button class="job-picker-item" onclick={() => addLinkedJob(job.dir)}>
+                      <span class="job-picker-company">{job.company}</span>
+                      <span class="job-picker-role">{job.role}</span>
+                      <span class="job-picker-date">{job.date}</span>
+                    </button>
+                  {/each}
+                </div>
+              {:else}
+                <p class="muted">No matching jobs found.</p>
+              {/if}
             </div>
           {/if}
         {/if}
@@ -752,5 +801,66 @@
   .error {
     color: var(--pico-del-color);
     font-size: 0.85rem;
+  }
+
+  /* Job linking */
+  .tag-remove {
+    all: unset;
+    cursor: pointer;
+    margin-left: 0.25rem;
+    font-size: 0.65rem;
+    color: var(--pico-del-color);
+    opacity: 0.6;
+  }
+
+  .tag-remove:hover {
+    opacity: 1;
+  }
+
+  .job-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border: 1px dashed var(--pico-muted-border-color);
+    border-radius: 4px;
+  }
+
+  .job-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .job-picker-item {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+  }
+
+  .job-picker-item:hover {
+    background: color-mix(in srgb, var(--pico-primary) 10%, transparent);
+  }
+
+  .job-picker-company {
+    font-weight: 600;
+  }
+
+  .job-picker-role {
+    color: var(--pico-muted-color);
+    flex: 1;
+  }
+
+  .job-picker-date {
+    font-family: monospace;
+    font-size: 0.72rem;
+    color: var(--pico-muted-color);
   }
 </style>

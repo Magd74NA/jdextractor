@@ -1,8 +1,12 @@
 <script lang="ts">
   import { api } from '../lib/api';
-  import { refreshJobs } from '../lib/stores.svelte';
-  import type { Job, JobStatus } from '../lib/types';
+  import { refreshJobs, getContacts, refreshContacts } from '../lib/stores.svelte';
+  import type { Job, JobStatus, Contact } from '../lib/types';
   import { JOB_STATUSES } from '../lib/types';
+
+  let linkedContacts = $derived(
+    getContacts().filter(c => (c.linked_jobs ?? []).includes(job.dir))
+  );
 
   let { job }: { job: Job } = $props();
 
@@ -77,6 +81,12 @@
     await api.deleteJob(job.dir);
     await refreshJobs();
   }
+
+  async function unlinkContact(contact: Contact) {
+    const updated = (contact.linked_jobs ?? []).filter(j => j !== job.dir);
+    await api.updateContact(contact.dir, { linked_jobs: updated });
+    await refreshContacts();
+  }
 </script>
 
 <tr>
@@ -130,6 +140,23 @@
               </div>
             </div>
             <textarea rows={8} bind:value={cover}></textarea>
+          </div>
+        {/if}
+
+        {#if linkedContacts.length > 0}
+          <div class="file-section">
+            <div class="file-header">
+              <h4>Linked Contacts</h4>
+            </div>
+            <div class="linked-tags">
+              {#each linkedContacts as c}
+                <span class="contact-tag">
+                  <a href="#/contacts">{c.name}</a>
+                  {#if c.company}<span class="contact-company">@ {c.company}</span>{/if}
+                  <button class="tag-remove" onclick={() => unlinkContact(c)} title="Unlink">x</button>
+                </span>
+              {/each}
+            </div>
           </div>
         {/if}
       {/if}
@@ -245,5 +272,44 @@
   .save-btn {
     color: var(--pico-ins-color);
     border-color: var(--pico-ins-color);
+  }
+
+  .linked-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .contact-tag {
+    background: var(--pico-secondary-background);
+    color: var(--pico-secondary);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .contact-tag a {
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .contact-company {
+    color: var(--pico-muted-color);
+    font-size: 0.72rem;
+  }
+
+  .tag-remove {
+    all: unset;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: var(--pico-del-color);
+    opacity: 0.6;
+  }
+
+  .tag-remove:hover {
+    opacity: 1;
   }
 </style>
