@@ -6,6 +6,14 @@ import (
 	"strconv"
 )
 
+// contactResponse is the wire type for GET /api/contacts. It embeds ContactMeta
+// and adds Dir as a JSON field — Dir is excluded from the stored meta.json
+// (json:"-") so it must be lifted here for the frontend to use as an ID.
+type contactResponse struct {
+	ContactMeta
+	Dir string `json:"dir"`
+}
+
 // handleListContacts returns all contacts as JSON.
 func (a *App) handleListContacts(w http.ResponseWriter, r *http.Request) {
 	contacts, err := ListContacts(a)
@@ -13,10 +21,11 @@ func (a *App) handleListContacts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "list contacts: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if contacts == nil {
-		contacts = []ContactMeta{}
+	out := make([]contactResponse, len(contacts))
+	for i, c := range contacts {
+		out[i] = contactResponse{ContactMeta: c, Dir: c.Dir}
 	}
-	writeJSON(w, contacts)
+	writeJSON(w, out)
 }
 
 // handleCreateContact creates a new contact from the JSON body.
@@ -50,7 +59,7 @@ func (a *App) handleGetContact(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	writeJSON(w, contact)
+	writeJSON(w, contactResponse{ContactMeta: *contact, Dir: contact.Dir})
 }
 
 // handleUpdateContact applies partial updates to a contact.
@@ -204,6 +213,14 @@ func (a *App) handleGenerateFollowupStream(w http.ResponseWriter, r *http.Reques
 	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Message: result.Message})
 }
 
+func contactsToResponses(contacts []ContactMeta) []contactResponse {
+	out := make([]contactResponse, len(contacts))
+	for i, c := range contacts {
+		out[i] = contactResponse{ContactMeta: c, Dir: c.Dir}
+	}
+	return out
+}
+
 // handleOverdueFollowups returns contacts with overdue follow-up dates.
 func (a *App) handleOverdueFollowups(w http.ResponseWriter, r *http.Request) {
 	contacts, err := ListOverdueFollowups(a)
@@ -211,10 +228,7 @@ func (a *App) handleOverdueFollowups(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "list overdue: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if contacts == nil {
-		contacts = []ContactMeta{}
-	}
-	writeJSON(w, contacts)
+	writeJSON(w, contactsToResponses(contacts))
 }
 
 // handleUpcomingFollowups returns contacts with follow-up dates in the next N days.
@@ -230,10 +244,7 @@ func (a *App) handleUpcomingFollowups(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "list upcoming: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if contacts == nil {
-		contacts = []ContactMeta{}
-	}
-	writeJSON(w, contacts)
+	writeJSON(w, contactsToResponses(contacts))
 }
 
 // handleGetNetworkingPromptConfig returns the current networking prompt config.
