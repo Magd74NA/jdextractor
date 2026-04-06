@@ -52,3 +52,49 @@ export interface ProgressEvent {
 export type JobStatus = 'draft' | 'applied' | 'interviewing' | 'offer' | 'rejected';
 
 export const JOB_STATUSES: JobStatus[] = ['draft', 'applied', 'interviewing', 'offer', 'rejected'];
+
+export interface ConversationEntry {
+  date: string;
+  channel?: string;
+  summary: string;
+  notes?: string;
+}
+
+export interface Contact {
+  dir: string;
+  name: string;
+  company?: string;
+  role?: string;
+  email?: string;
+  phone?: string;
+  linkedin?: string;
+  source?: string;
+  status: string;
+  follow_up_date?: string;
+  linked_jobs?: string[];
+  tags?: string[];
+  notes?: string;
+  conversations: ConversationEntry[];
+  created: string;
+}
+
+export interface FollowupResult {
+  subject?: string;
+  message: string;
+  channel: string;
+  timing: string;
+  notes: string;
+}
+
+export interface NetworkingPromptConfig {
+  system_prompt: string;
+  task_list: string;
+}
+
+export type ContactStatus = 'new' | 'reached-out' | 'replied' | 'meeting-scheduled' | 'connected' | 'dormant';
+
+export const CONTACT_STATUSES: ContactStatus[] = [
+  'new', 'reached-out', 'replied', 'meeting-scheduled', 'connected', 'dormant',
+];
+
+export const CHANNELS = ['email', 'linkedin', 'phone', 'in-person', 'event', 'other'] as const;

@@ -187,6 +187,29 @@ func UpdateJobMeta(a *App, id string, company, role, date *string) error {
 	return os.WriteFile(metaPath, out, 0644)
 }
 
+// FindJobByPrefix finds a job directory by prefix, returning an error if there are
+// zero or multiple matches.
+func FindJobByPrefix(a *App, prefix string) (string, error) {
+	entries, err := os.ReadDir(a.Paths.Jobs)
+	if err != nil {
+		return "", fmt.Errorf("read jobs directory: %w", err)
+	}
+	var matches []string
+	for _, e := range entries {
+		if e.IsDir() && st.HasPrefix(e.Name(), prefix) {
+			matches = append(matches, e.Name())
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("no job directory matches prefix %q", prefix)
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("prefix %q is ambiguous: matches %s", prefix, st.Join(matches, ", "))
+	}
+}
+
 // UpdateJobStatus finds a job by directory prefix and updates its status in meta.json.
 func UpdateJobStatus(a *App, prefix, status string) error {
 	if !slices.Contains(validStatuses, status) {

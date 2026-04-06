@@ -22,6 +22,43 @@ type PromptConfig struct {
 	SystemPrompt string `json:"system_prompt"`
 }
 
+// NetworkingPromptConfig holds prompts for AI follow-up message generation.
+type NetworkingPromptConfig struct {
+	SystemPrompt string `json:"system_prompt"`
+	TaskList     string `json:"task_list"`
+}
+
+func CreateEmptyNetworkingPromptConfig(path string) error {
+	cfg := NetworkingPromptConfig{
+		SystemPrompt: "You are a professional networking coach helping with job search outreach.\nYou will receive context about a contact, their conversation history, and relationship status.\n",
+		TaskList:     "1. Analyze the conversation history and relationship stage.\n2. Draft a natural, personalized follow-up message appropriate for the channel and context.\n3. Suggest the best timing and channel for the follow-up.\n4. Keep the tone professional but warm — avoid sounding templated or generic.",
+	}
+	return SaveNetworkingPromptConfig(path, cfg)
+}
+
+// SaveNetworkingPromptConfig writes cfg to path as indented JSON with 0600 permissions.
+func SaveNetworkingPromptConfig(path string, cfg NetworkingPromptConfig) error {
+	data, err := json.MarshalIndent(cfg, "", "\t")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
+}
+
+// LoadNetworkingPromptConfig reads and JSON-decodes a NetworkingPromptConfig from an open file.
+func LoadNetworkingPromptConfig(f *os.File) (*NetworkingPromptConfig, error) {
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	var cfg NetworkingPromptConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 func CreateEmptyPromptConfig(path string) error {
 	cfg := PromptConfig{
 		SystemPrompt: "You are a professional resume writer and career coach.\nYou will receive a job description as a JSON array of classified lines, a base resume, and optionally a base cover letter.\n",

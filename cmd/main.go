@@ -27,6 +27,7 @@ Usage:
   jdextract generate          (reads from stdin)
   jdextract list
   jdextract status <prefix> <status>
+  jdextract contacts <subcommand> [args]
   jdextract serve [--port <port>] [--open]
 
 Subcommands:
@@ -38,7 +39,43 @@ Subcommands:
   list      Print a table of processed job applications.
   status    Update the status of a job by directory prefix.
             Valid statuses: draft, applied, interviewing, offer, rejected
+  contacts  Manage networking contacts (see: jdextract contacts help).
   serve     Start the web UI. Defaults to port 8080; --open launches a browser.
+`
+
+const contactsUsage = `jdextract contacts — manage networking contacts
+
+Usage:
+  jdextract contacts list
+  jdextract contacts add --name <name> [options]
+  jdextract contacts status <prefix> <status>
+  jdextract contacts log <prefix> --summary <text> [--channel <ch>] [--notes <text>]
+  jdextract contacts followup <prefix>
+  jdextract contacts overdue
+  jdextract contacts delete <prefix>
+  jdextract contacts link <contact-prefix> <job-prefix>
+
+Subcommands:
+  list      Print a table of all contacts.
+  add       Add a new contact.
+  status    Update contact relationship status.
+            Valid statuses: new, reached-out, replied, meeting-scheduled, connected, dormant
+  log       Log a new conversation with a contact.
+  followup  Generate an AI follow-up message for a contact.
+  overdue   List contacts with overdue follow-up dates.
+  delete    Delete a contact by directory prefix.
+  link      Link a contact to a job application directory.
+
+Options for add:
+  --name       Contact name (required)
+  --company    Company name
+  --role       Their role/title
+  --email      Email address
+  --phone      Phone number
+  --linkedin   LinkedIn URL
+  --source     How you met (e.g. conference, referral, cold outreach)
+  --follow-up  Follow-up date (YYYY-MM-DD)
+  --notes      General notes
 `
 
 func main() {
@@ -63,6 +100,8 @@ func main() {
 		cmdList()
 	case "status":
 		cmdStatus(os.Args[2:])
+	case "contacts":
+		cmdContacts(os.Args[2:])
 	case "serve":
 		cmdServe(os.Args[2:])
 	case "version", "--version", "-version":
@@ -311,6 +350,260 @@ func cmdServe(args []string) {
 		fmt.Fprintf(os.Stderr, "serve error: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+func cmdContacts(args []string) {
+	if len(args) < 1 {
+		fmt.Fprint(os.Stderr, contactsUsage)
+		os.Exit(1)
+	}
+	switch args[0] {
+	case "list":
+		cmdContactsList()
+	case "add":
+		cmdContactsAdd(args[1:])
+	case "status":
+		cmdContactsStatus(args[1:])
+	case "log":
+		cmdContactsLog(args[1:])
+	case "followup":
+		cmdContactsFollowup(args[1:])
+	case "overdue":
+		cmdContactsOverdue()
+	case "delete":
+		cmdContactsDelete(args[1:])
+	case "link":
+		cmdContactsLink(args[1:])
+	case "help", "--help", "-h":
+		fmt.Fprint(os.Stdout, contactsUsage)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown contacts subcommand %q\n\n%s", args[0], contactsUsage)
+		os.Exit(1)
+	}
+}
+
+func cmdContactsList() {
+	app := initApp()
+	contacts, err := jdextract.ListContacts(app)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "list error: %s\n", err)
+		os.Exit(1)
+	}
+	if len(contacts) == 0 {
+		fmt.Println("No contacts found.")
+		return
+	}
+	fmt.Print(jdextract.FormatContacts(contacts))
+}
+
+func cmdContactsAdd(args []string) {
+	fs := flag.NewFlagSet("contacts add", flag.ExitOnError)
+	name := fs.String("name", "", "Contact name (required)")
+	company := fs.String("company", "", "Company name")
+	role := fs.String("role", "", "Their role/title")
+	email := fs.String("email", "", "Email address")
+	phone := fs.String("phone", "", "Phone number")
+	linkedin := fs.String("linkedin", "", "LinkedIn URL")
+	source := fs.String("source", "", "How you met")
+	followUp := fs.String("follow-up", "", "Follow-up date (YYYY-MM-DD)")
+	notes := fs.String("notes", "", "General notes")
+	fs.Parse(args)
+
+	if *name == "" {
+		fmt.Fprintln(os.Stderr, "error: --name is required")
+		os.Exit(1)
+	}
+
+	app := initApp()
+	meta := jdextract.ContactMeta{
+		Name:         *name,
+		Company:      *company,
+		Role:         *role,
+		Email:        *email,
+		Phone:        *phone,
+		LinkedIn:     *linkedin,
+		Source:       *source,
+		FollowUpDate: *followUp,
+		Notes:        *notes,
+	}
+	dir, err := jdextract.CreateContact(app, meta)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Created contact: %s\n", dir)
+}
+
+func cmdContactsStatus(args []string) {
+	if len(args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: jdextract contacts status <prefix> <status>")
+		os.Exit(1)
+	}
+	app := initApp()
+	dir, err := jdextract.FindContactByPrefix(app, args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	status := args[1]
+	updates := jdextract.ContactUpdate{Status: &status}
+	if err := jdextract.UpdateContact(app, dir, updates); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Updated %s → %s\n", dir, status)
+}
+
+func cmdContactsLog(args []string) {
+	fs := flag.NewFlagSet("contacts log", flag.ExitOnError)
+	summary := fs.String("summary", "", "What was discussed (required)")
+	channel := fs.String("channel", "", "Channel: email, linkedin, phone, in-person, event, other")
+	notes := fs.String("notes", "", "Additional context")
+	fs.Parse(args)
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "usage: jdextract contacts log <prefix> --summary <text> [--channel <ch>]")
+		os.Exit(1)
+	}
+	if *summary == "" {
+		fmt.Fprintln(os.Stderr, "error: --summary is required")
+		os.Exit(1)
+	}
+
+	app := initApp()
+	dir, err := jdextract.FindContactByPrefix(app, fs.Arg(0))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	entry := jdextract.ConversationEntry{
+		Summary: *summary,
+		Channel: *channel,
+		Notes:   *notes,
+	}
+	if err := jdextract.AddConversation(app, dir, entry); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Logged conversation for %s\n", dir)
+}
+
+func cmdContactsFollowup(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: jdextract contacts followup <prefix>")
+		os.Exit(1)
+	}
+	app := initAppWithConfig()
+	dir, err := jdextract.FindContactByPrefix(app, args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	contact, err := jdextract.GetContact(app, dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+
+	invoker := jdextract.LLMInvoker(jdextract.InvokeDeepseekApi)
+	streamInvoker := jdextract.StreamingLLMInvoker(jdextract.InvokeDeepseekApiStream)
+	apiKey := app.Config.DeepSeekApiKey
+	model := app.Config.DeepSeekModel
+	if app.Config.Backend == "kimi" {
+		invoker = jdextract.InvokeKimiApi
+		streamInvoker = jdextract.InvokeKimiApiStream
+		apiKey = app.Config.KimiApiKey
+		model = app.Config.KimiModel
+	}
+
+	fmt.Fprintln(os.Stderr, "Generating follow-up message…")
+	result, err := jdextract.GenerateFollowup(
+		context.Background(),
+		invoker,
+		streamInvoker,
+		apiKey,
+		model,
+		&app.Client,
+		*contact,
+		app.NetworkingPromptConfig,
+		func(delta string) { fmt.Fprint(os.Stderr, delta) },
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\ngenerate error: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Fprintln(os.Stderr)
+	if result.Subject != "" {
+		fmt.Printf("Subject: %s\n\n", result.Subject)
+	}
+	fmt.Println(result.Message)
+	fmt.Printf("\n--- Channel: %s | Timing: %s ---\n", result.Channel, result.Timing)
+	if result.Notes != "" {
+		fmt.Printf("Notes: %s\n", result.Notes)
+	}
+}
+
+func cmdContactsOverdue() {
+	app := initApp()
+	contacts, err := jdextract.ListOverdueFollowups(app)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	if len(contacts) == 0 {
+		fmt.Println("No overdue follow-ups.")
+		return
+	}
+	fmt.Print(jdextract.FormatContacts(contacts))
+}
+
+func cmdContactsDelete(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: jdextract contacts delete <prefix>")
+		os.Exit(1)
+	}
+	app := initApp()
+	dir, err := jdextract.FindContactByPrefix(app, args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	if err := jdextract.DeleteContact(app, dir); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Deleted contact: %s\n", dir)
+}
+
+func cmdContactsLink(args []string) {
+	if len(args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: jdextract contacts link <contact-prefix> <job-prefix>")
+		os.Exit(1)
+	}
+	app := initApp()
+	contactDir, err := jdextract.FindContactByPrefix(app, args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "contact error: %s\n", err)
+		os.Exit(1)
+	}
+	// Resolve job prefix against jobs directory
+	jobDir, err := jdextract.FindJobByPrefix(app, args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "job error: %s\n", err)
+		os.Exit(1)
+	}
+	contact, err := jdextract.GetContact(app, contactDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	linked := append(contact.LinkedJobs, jobDir)
+	updates := jdextract.ContactUpdate{LinkedJobs: &linked}
+	if err := jdextract.UpdateContact(app, contactDir, updates); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Linked %s → %s\n", contactDir, jobDir)
 }
 
 func isTerminal() bool {

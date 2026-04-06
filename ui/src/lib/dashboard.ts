@@ -1,4 +1,4 @@
-import type { Job } from './types';
+import type { Job, Contact } from './types';
 
 export interface DashboardStats {
   total: number;
@@ -65,6 +65,26 @@ export function computeActivityData(jobs: Job[]): [number[], number[]] {
   }
 
   return [xs, ys];
+}
+
+export interface NetworkingStats {
+  totalContacts: number;
+  activeContacts: number;
+  overdueFollowups: number;
+  upcomingFollowups: number;
+}
+
+export function computeNetworkingStats(contacts: Contact[]): NetworkingStats {
+  const today = new Date().toISOString().slice(0, 10);
+  const weekFromNow = new Date(Date.now() + 7 * DAY_S * 1000).toISOString().slice(0, 10);
+  return {
+    totalContacts: contacts.length,
+    activeContacts: contacts.filter(c => c.status !== 'dormant').length,
+    overdueFollowups: contacts.filter(c => c.follow_up_date && c.follow_up_date <= today).length,
+    upcomingFollowups: contacts.filter(
+      c => c.follow_up_date && c.follow_up_date > today && c.follow_up_date <= weekFromNow,
+    ).length,
+  };
 }
 
 export function computeScoreDistribution(jobs: Job[]): [number[], number[]] {

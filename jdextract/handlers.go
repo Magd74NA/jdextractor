@@ -35,6 +35,23 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/process/batch", a.handleProcessBatch)
 	mux.HandleFunc("POST /api/process/local", a.handleProcessLocal)
 	mux.HandleFunc("POST /api/process/local/stream", a.handleProcessLocalStream)
+
+	// Contacts — specific paths before wildcard /{id}
+	mux.HandleFunc("GET /api/contacts/overdue", a.handleOverdueFollowups)
+	mux.HandleFunc("GET /api/contacts/upcoming", a.handleUpcomingFollowups)
+	mux.HandleFunc("GET /api/contacts", a.handleListContacts)
+	mux.HandleFunc("POST /api/contacts", a.handleCreateContact)
+	mux.HandleFunc("GET /api/contacts/{id}", a.handleGetContact)
+	mux.HandleFunc("PATCH /api/contacts/{id}", a.handleUpdateContact)
+	mux.HandleFunc("DELETE /api/contacts/{id}", a.handleDeleteContact)
+	mux.HandleFunc("POST /api/contacts/{id}/conversations", a.handleAddConversation)
+	mux.HandleFunc("DELETE /api/contacts/{id}/conversations/{index}", a.handleDeleteConversation)
+	mux.HandleFunc("POST /api/contacts/{id}/followup", a.handleGenerateFollowup)
+	mux.HandleFunc("POST /api/contacts/{id}/followup/stream", a.handleGenerateFollowupStream)
+
+	// Networking prompt config
+	mux.HandleFunc("GET /api/config/networking-prompt", a.handleGetNetworkingPromptConfig)
+	mux.HandleFunc("PATCH /api/config/networking-prompt", a.handleUpdateNetworkingPromptConfig)
 }
 
 // writeJSON sets Content-Type and encodes v as JSON.

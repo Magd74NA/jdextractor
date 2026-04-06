@@ -32,7 +32,7 @@ func (a *App) createExampleTemplates() error {
 // they do not already exist. It is safe to call Setup on an existing installation;
 // it will not overwrite files the user has already customised.
 func (a *App) Setup() error {
-	for _, dir := range []string{a.Paths.Data, a.Paths.Config, a.Paths.Jobs, a.Paths.Templates} {
+	for _, dir := range []string{a.Paths.Data, a.Paths.Config, a.Paths.Jobs, a.Paths.Templates, a.Paths.Contacts} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("cannot create %s: %w", dir, err)
 		}

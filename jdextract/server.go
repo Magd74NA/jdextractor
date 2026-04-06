@@ -32,6 +32,19 @@ func (a *App) Serve(ctx context.Context, port string) error {
 		}
 	}
 
+	// Ensure networking_prompt.json exists and NetworkingPromptConfig is populated.
+	networkingPromptPath := filepath.Join(a.Paths.Config, "networking_prompt.json")
+	if a.NetworkingPromptConfig.SystemPrompt == "" && a.NetworkingPromptConfig.TaskList == "" {
+		if _, err := os.Stat(networkingPromptPath); os.IsNotExist(err) {
+			_ = CreateEmptyNetworkingPromptConfig(networkingPromptPath)
+		}
+		if f, err := os.Open(networkingPromptPath); err == nil {
+			if cfg, err := LoadNetworkingPromptConfig(f); err == nil {
+				a.NetworkingPromptConfig = *cfg
+			}
+		}
+	}
+
 	mux := http.NewServeMux()
 	a.registerRoutes(mux)
 

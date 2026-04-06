@@ -5,12 +5,14 @@
   import Jobs from "./routes/Jobs.svelte";
   import Process from "./routes/Process.svelte";
   import Settings from "./routes/Settings.svelte";
+  import Contacts from "./routes/Contacts.svelte";
   import { loadConfig, loadPromptConfig } from "./lib/stores.svelte";
 
   const routes = {
     "/": Home,
     "/jobs": Jobs,
     "/process": Process,
+    "/contacts": Contacts,
     "/settings": Settings,
   };
 

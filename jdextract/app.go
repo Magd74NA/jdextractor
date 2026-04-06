@@ -16,16 +16,18 @@ type PortablePaths struct {
 	Data      string // Root/data
 	Config    string // Root/config — holds config.json
 	Templates string // Root/config/templates — resume.txt and cover.txt
+	Contacts  string // Root/data/contacts — one subdirectory per networking contact
 }
 
 // App is the central application object. It is initialised by NewApp and shared
 // across all operations. The CLI creates one App per invocation; the web server
 // holds a single App for its lifetime.
 type App struct {
-	Paths        PortablePaths
-	Config       Config
-	PromptConfig PromptConfig
-	Client       http.Client
+	Paths                  PortablePaths
+	Config                 Config
+	PromptConfig           PromptConfig
+	NetworkingPromptConfig NetworkingPromptConfig
+	Client                 http.Client
 }
 
 func getPortablePaths() (PortablePaths, error) {
@@ -48,6 +50,7 @@ func getPortablePaths() (PortablePaths, error) {
 		Jobs:      filepath.Join(root, "data", "jobs"),
 		Config:    filepath.Join(root, "config"),
 		Templates: filepath.Join(root, "config", "templates"),
+		Contacts:  filepath.Join(root, "data", "contacts"),
 	}
 
 	return paths, nil

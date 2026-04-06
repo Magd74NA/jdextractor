@@ -1,4 +1,4 @@
-import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult, ProgressEvent } from './types';
+import type { Config, PromptConfig, Templates, Job, JobFiles, BatchResult, ProcessResult, ProgressEvent, Contact, ConversationEntry, FollowupResult, NetworkingPromptConfig } from './types';
 
 const BASE = '/api';
 
@@ -41,6 +41,30 @@ export const api = {
     consumeSSE(`${BASE}/process/stream`, { url }, onProgress),
   processLocalStream: (content: string, onProgress: (event: ProgressEvent) => void) =>
     consumeSSE(`${BASE}/process/local/stream`, { content }, onProgress),
+
+  // Contacts
+  getContacts: () => request<Contact[]>('GET', '/contacts'),
+  createContact: (data: Partial<Contact>) => request<{ dir: string }>('POST', '/contacts', data),
+  getContact: (id: string) => request<Contact>('GET', `/contacts/${id}`),
+  updateContact: (id: string, data: Partial<Contact>) => request<null>('PATCH', `/contacts/${id}`, data),
+  deleteContact: (id: string) => request<null>('DELETE', `/contacts/${id}`),
+  addConversation: (id: string, entry: ConversationEntry) =>
+    request<null>('POST', `/contacts/${id}/conversations`, entry),
+  deleteConversation: (id: string, index: number) =>
+    request<null>('DELETE', `/contacts/${id}/conversations/${index}`),
+  generateFollowup: (id: string) => request<FollowupResult>('POST', `/contacts/${id}/followup`),
+  generateFollowupStream: async (id: string, onProgress: (event: ProgressEvent) => void): Promise<string> => {
+    const final = await consumeSSERaw(`${BASE}/contacts/${id}/followup/stream`, {}, onProgress);
+    return final.message ?? '';
+  },
+  getOverdueFollowups: () => request<Contact[]>('GET', '/contacts/overdue'),
+  getUpcomingFollowups: (days?: number) =>
+    request<Contact[]>('GET', `/contacts/upcoming${days !== undefined ? `?days=${days}` : ''}`),
+
+  // Networking prompt config
+  getNetworkingPromptConfig: () => request<NetworkingPromptConfig>('GET', '/config/networking-prompt'),
+  saveNetworkingPromptConfig: (data: Partial<NetworkingPromptConfig>) =>
+    request<null>('PATCH', '/config/networking-prompt', data),
 };
 
 async function consumeSSE(
@@ -48,6 +72,15 @@ async function consumeSSE(
   body: unknown,
   onProgress: (event: ProgressEvent) => void,
 ): Promise<ProcessResult> {
+  const finalEvent = await consumeSSERaw(url, body, onProgress);
+  return { dir: finalEvent.dir! };
+}
+
+export async function consumeSSERaw(
+  url: string,
+  body: unknown,
+  onProgress: (event: ProgressEvent) => void,
+): Promise<ProgressEvent> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -60,7 +93,7 @@ async function consumeSSE(
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let result: ProcessResult | null = null;
+  let finalEvent: ProgressEvent | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -77,12 +110,12 @@ async function consumeSSE(
         throw new Error(event.message || 'Processing failed');
       }
       if (event.stage === 'complete') {
-        result = { dir: event.dir! };
+        finalEvent = event;
       }
       onProgress(event);
     }
   }
 
-  if (!result) throw new Error('Stream ended without completion');
-  return result;
+  if (!finalEvent) throw new Error('Stream ended without completion');
+  return finalEvent;
 }
