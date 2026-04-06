@@ -113,13 +113,6 @@ textarea.mono {
   color: var(--pico-ins-color);
 }
 
-small.success {
-  color: var(--pico-ins-color);
-}
-
-small.error {
-  color: var(--pico-del-color);
-}
 
 .muted {
   color: var(--pico-muted-color);

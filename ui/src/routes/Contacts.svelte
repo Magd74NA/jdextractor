@@ -65,7 +65,7 @@
 <div class="page-header">
   <h2>Contacts</h2>
   <button
-    class="outline btn-sm"
+    class="outline"
     onclick={() => {
       showForm = !showForm;
       if (!showForm) resetForm();
@@ -136,22 +136,6 @@
 <ContactsTable />
 
 <style>
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-  }
-
-  .page-header h2 {
-    margin: 0;
-  }
-
-  .btn-sm {
-    padding: 0.3em 0.75em;
-    margin-bottom: 0;
-  }
-
   .contact-form {
     margin-bottom: 2rem;
     padding: 1.5rem;

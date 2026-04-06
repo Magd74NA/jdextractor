@@ -151,7 +151,7 @@
 
   <label>
     <h4>Task List</h4>
-    <textarea rows={3} bind:value={taskList}></textarea>
+    <textarea class="mono" rows={3} bind:value={taskList}></textarea>
   </label>
 
   <button onclick={save} disabled={saving}>
@@ -182,11 +182,6 @@
   label {
     margin-bottom: 0.75rem;
     display: block;
-  }
-
-  textarea {
-    font-family: monospace;
-    font-size: 0.85rem;
   }
 
   small {

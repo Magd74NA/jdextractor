@@ -186,7 +186,7 @@
             </div>
             <div class="linked-tags">
               {#each linkedContacts as c}
-                <span class="contact-tag">
+                <span class="tag contact-tag">
                   <a href="#/contacts">{c.name}</a>
                   {#if c.company}<span class="contact-company"
                       >@ {c.company}</span
@@ -220,11 +220,6 @@
   }
 
   .contact-tag {
-    background: var(--pico-secondary-background);
-    color: var(--pico-secondary);
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.78rem;
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
