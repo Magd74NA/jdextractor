@@ -30,9 +30,10 @@ type ContactMeta struct {
 
 // Message is a single message within a conversation thread.
 type Message struct {
-	Sender  string `json:"sender"` // freeform name: "me", "Jane Doe", etc.
-	Content string `json:"content"`
-	Date    string `json:"date"` // YYYY-MM-DD
+	Sender    string `json:"sender"`              // freeform name: "me", "Jane Doe", etc.
+	Content   string `json:"content"`
+	Date      string `json:"date"`                // YYYY-MM-DD
+	Generated bool   `json:"generated,omitempty"` // true if AI-drafted
 }
 
 // Conversation is a thread of messages with a contact.
@@ -319,6 +320,72 @@ func FormatContacts(contacts []ContactMeta) string {
 	}
 	w.Flush()
 	return buf.String()
+}
+
+// validFollowupChannels is the set of channels accepted by SendFollowup.
+var validFollowupChannels = []string{"email", "linkedin", "phone", "in-person", "other"}
+
+// SendFollowupInput holds the parameters for SendFollowup.
+type SendFollowupInput struct {
+	Content        string // required
+	Channel        string // required; one of validFollowupChannels
+	NextFollowUpDate string // optional; YYYY-MM-DD or ""
+}
+
+// SendFollowup logs a sent follow-up message to the contact's conversation
+// thread (finding the most recent thread matching the channel, or creating one),
+// clears or advances FollowUpDate, and persists the contact. Returns the updated ContactMeta.
+func SendFollowup(a *App, id string, input SendFollowupInput) (*ContactMeta, error) {
+	if input.Content == "" {
+		return nil, fmt.Errorf("content is required")
+	}
+	validChannel := false
+	for _, ch := range validFollowupChannels {
+		if input.Channel == ch {
+			validChannel = true
+			break
+		}
+	}
+	if !validChannel {
+		return nil, fmt.Errorf("invalid channel %q: must be one of %s", input.Channel, st.Join(validFollowupChannels, ", "))
+	}
+
+	var updated *ContactMeta
+	err := mutateContact(&a.Contacts, id, func(m *ContactMeta) error {
+		// Find the most recent conversation whose channel matches.
+		convIdx := -1
+		for i := len(m.Conversations) - 1; i >= 0; i-- {
+			if m.Conversations[i].Channel == input.Channel {
+				convIdx = i
+				break
+			}
+		}
+		if convIdx == -1 {
+			// Create a new conversation thread for this channel.
+			m.Conversations = append(m.Conversations, Conversation{
+				Channel:  input.Channel,
+				Summary:  "",
+				Messages: []Message{},
+				Created:  currentDate(),
+			})
+			convIdx = len(m.Conversations) - 1
+		}
+
+		msg := Message{
+			Sender:    "me",
+			Content:   input.Content,
+			Date:      currentDate(),
+			Generated: true,
+		}
+		m.Conversations[convIdx].Messages = append(m.Conversations[convIdx].Messages, msg)
+		m.FollowUpDate = input.NextFollowUpDate
+		updated = m
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 // FindContactByPrefix finds a contact directory by prefix, returning an error if

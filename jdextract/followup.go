@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const networkingResponseFormat = `Respond using exactly these XML tags, in this order:
@@ -20,11 +22,57 @@ the full follow-up message text
 
 // FollowupResult holds the parsed LLM output for a follow-up message.
 type FollowupResult struct {
-	Subject string `json:"subject,omitempty"`
-	Message string `json:"message"`
-	Channel string `json:"channel"`
-	Timing  string `json:"timing"`
-	Notes   string `json:"notes"`
+	Subject           string `json:"subject,omitempty"`
+	Message           string `json:"message"`
+	Channel           string `json:"channel"`
+	Timing            string `json:"timing"`
+	Notes             string `json:"notes"`
+	SuggestedNextDate string `json:"suggested_next_date,omitempty"` // YYYY-MM-DD derived from Timing
+}
+
+var (
+	timingDaysRe   = regexp.MustCompile(`(?i)(\d+)\s*day`)
+	timingWeeksRe  = regexp.MustCompile(`(?i)(\d+)\s*week`)
+	timingMonthsRe = regexp.MustCompile(`(?i)(\d+)\s*month`)
+)
+
+// parseSuggestedDate heuristically converts a timing string into a YYYY-MM-DD date.
+// Falls back to today + 7 days if no pattern matches.
+func parseSuggestedDate(timing string) string {
+	t := strings.ToLower(timing)
+	today := time.Now()
+
+	if strings.Contains(t, "today") || strings.Contains(t, "asap") || strings.Contains(t, "immediately") {
+		return today.AddDate(0, 0, 1).Format("2006-01-02")
+	}
+	if strings.Contains(t, "tomorrow") || strings.Contains(t, "24 hour") || strings.Contains(t, "24h") {
+		return today.AddDate(0, 0, 1).Format("2006-01-02")
+	}
+	if strings.Contains(t, "48 hour") || strings.Contains(t, "2 day") || strings.Contains(t, "within 2") {
+		return today.AddDate(0, 0, 2).Format("2006-01-02")
+	}
+	if m := timingDaysRe.FindStringSubmatch(t); m != nil {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			return today.AddDate(0, 0, n).Format("2006-01-02")
+		}
+	}
+	if strings.Contains(t, "next week") || strings.Contains(t, "a week") || strings.Contains(t, "one week") {
+		return today.AddDate(0, 0, 7).Format("2006-01-02")
+	}
+	if m := timingWeeksRe.FindStringSubmatch(t); m != nil {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			return today.AddDate(0, 0, n*7).Format("2006-01-02")
+		}
+	}
+	if strings.Contains(t, "month") {
+		return today.AddDate(0, 0, 30).Format("2006-01-02")
+	}
+	if m := timingMonthsRe.FindStringSubmatch(t); m != nil {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			return today.AddDate(0, n, 0).Format("2006-01-02")
+		}
+	}
+	return today.AddDate(0, 0, 7).Format("2006-01-02")
 }
 
 var (
@@ -175,12 +223,14 @@ func GenerateFollowup(
 		content = apiResp.Choices[0].Message.Content
 	}
 
+	timing := strings.TrimSpace(extractTag(followupTimingRe, content))
 	result := &FollowupResult{
-		Subject: strings.TrimSpace(extractTag(followupSubjectRe, content)),
-		Message: strings.TrimSpace(extractTag(followupMessageRe, content)),
-		Channel: strings.TrimSpace(extractTag(followupChannelRe, content)),
-		Timing:  strings.TrimSpace(extractTag(followupTimingRe, content)),
-		Notes:   strings.TrimSpace(extractTag(followupNotesRe, content)),
+		Subject:           strings.TrimSpace(extractTag(followupSubjectRe, content)),
+		Message:           strings.TrimSpace(extractTag(followupMessageRe, content)),
+		Channel:           strings.TrimSpace(extractTag(followupChannelRe, content)),
+		Timing:            timing,
+		Notes:             strings.TrimSpace(extractTag(followupNotesRe, content)),
+		SuggestedNextDate: parseSuggestedDate(timing),
 	}
 
 	if result.Message == "" {

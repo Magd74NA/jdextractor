@@ -52,6 +52,7 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/contacts/{id}/conversations/{index}/messages/{msgIndex}", a.handleDeleteMessage)
 	mux.HandleFunc("POST /api/contacts/{id}/followup", a.handleGenerateFollowup)
 	mux.HandleFunc("POST /api/contacts/{id}/followup/stream", a.handleGenerateFollowupStream)
+	mux.HandleFunc("POST /api/contacts/{id}/followup/send", a.handleSendFollowup)
 
 	// Networking prompt config
 	mux.HandleFunc("GET /api/config/networking-prompt", a.handleGetNetworkingPromptConfig)

@@ -315,6 +315,45 @@ func (a *App) handleGenerateFollowupStream(w http.ResponseWriter, r *http.Reques
 	writeSSE(w, flusher, ProgressEvent{Stage: StageComplete, Message: string(resultJSON)})
 }
 
+// handleSendFollowup logs a sent follow-up message and optionally advances the follow-up date.
+func (a *App) handleSendFollowup(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		http.Error(w, "invalid contact id", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		Content        string `json:"content"`
+		Channel        string `json:"channel"`
+		NextFollowUpDate string `json:"next_followup_date"`
+	}
+	if !decodeBody(w, r, &body) {
+		return
+	}
+	if body.Content == "" {
+		http.Error(w, "content is required", http.StatusBadRequest)
+		return
+	}
+	if body.Channel == "" {
+		http.Error(w, "channel is required", http.StatusBadRequest)
+		return
+	}
+	updated, err := SendFollowup(a, id, SendFollowupInput{
+		Content:        body.Content,
+		Channel:        body.Channel,
+		NextFollowUpDate: body.NextFollowUpDate,
+	})
+	if err != nil {
+		if updated == nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	writeJSON(w, contactResponse{ContactMeta: *updated, Dir: id})
+}
+
 func contactsToResponses(contacts []ContactMeta) []contactResponse {
 	out := make([]contactResponse, len(contacts))
 	for i, c := range contacts {

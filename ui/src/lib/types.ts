@@ -57,6 +57,7 @@ export interface Message {
   sender: string;
   content: string;
   date: string;
+  generated?: boolean;
 }
 
 export interface Conversation {
@@ -90,6 +91,7 @@ export interface FollowupResult {
   channel: string;
   timing: string;
   notes: string;
+  suggested_next_date?: string;
 }
 
 export interface NetworkingPromptConfig {

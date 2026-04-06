@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api } from "../lib/api";
   import type { Contact, FollowupResult } from "../lib/types";
+  import { CHANNELS } from "../lib/types";
 
   let overdue = $state<Contact[]>([]);
   let upcoming = $state<Contact[]>([]);
@@ -11,6 +12,49 @@
   let streamingText = $state<Record<string, string>>({});
   let generatedResults = $state<Record<string, FollowupResult>>({});
   let generateErrors = $state<Record<string, string>>({});
+
+  // Mark Sent modal state
+  let markSentDir = $state<string | null>(null);
+  let markSentContact = $state<Contact | null>(null);
+  let markSentContent = $state("");
+  let markSentChannel = $state("");
+  let markSentNextDate = $state("");
+  let markSentSaving = $state(false);
+  let markSentError = $state("");
+
+  function openMarkSent(contact: Contact) {
+    markSentDir = contact.dir;
+    markSentContact = contact;
+    markSentContent = "";
+    markSentChannel = contact.conversations.at(-1)?.channel ?? "";
+    markSentNextDate = "";
+    markSentError = "";
+  }
+
+  function closeMarkSent() {
+    markSentDir = null;
+    markSentContact = null;
+  }
+
+  async function submitMarkSent() {
+    if (!markSentDir || !markSentContent.trim() || !markSentChannel) return;
+    markSentSaving = true;
+    markSentError = "";
+    try {
+      const body: { content: string; channel: string; next_followup_date?: string } = {
+        content: markSentContent,
+        channel: markSentChannel,
+      };
+      if (markSentNextDate) body.next_followup_date = markSentNextDate;
+      await api.sendFollowup(markSentDir, body);
+      closeMarkSent();
+      await loadQueue();
+    } catch (e) {
+      markSentError = e instanceof Error ? e.message : "Failed to log";
+    } finally {
+      markSentSaving = false;
+    }
+  }
 
   async function loadQueue() {
     try {
@@ -123,6 +167,12 @@
               >
                 Generate
               </button>
+              <button
+                class="outline btn-sm"
+                onclick={() => openMarkSent(contact)}
+              >
+                Mark Sent
+              </button>
             </div>
           </div>
 
@@ -190,6 +240,12 @@
               >
                 Generate
               </button>
+              <button
+                class="outline btn-sm"
+                onclick={() => openMarkSent(contact)}
+              >
+                Mark Sent
+              </button>
             </div>
           </div>
 
@@ -226,6 +282,48 @@
       {/each}
     </div>
   {/if}
+{/if}
+
+<!-- Mark Sent modal -->
+{#if markSentDir}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-backdrop" onclick={closeMarkSent}>
+    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+      <h4 class="modal-title">Log Sent Message — {markSentContact?.name}</h4>
+      <div class="modal-body">
+        <label>
+          Channel
+          <select bind:value={markSentChannel}>
+            <option value="">Select channel</option>
+            {#each CHANNELS as ch}
+              <option value={ch}>{ch}</option>
+            {/each}
+          </select>
+        </label>
+        <label>
+          Message
+          <textarea rows={5} bind:value={markSentContent} placeholder="What did you send?"></textarea>
+        </label>
+        <label>
+          Next follow-up date (optional)
+          <input type="date" bind:value={markSentNextDate} />
+        </label>
+        {#if markSentError}
+          <p class="error">{markSentError}</p>
+        {/if}
+      </div>
+      <div class="modal-footer">
+        <button class="outline btn-sm" onclick={closeMarkSent}>Cancel</button>
+        <button
+          class="btn-sm"
+          onclick={submitMarkSent}
+          aria-busy={markSentSaving}
+          disabled={markSentSaving || !markSentContent.trim() || !markSentChannel}
+        >Log</button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -339,5 +437,58 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  /* Mark Sent modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .modal {
+    background: var(--pico-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 6px;
+    padding: 1.25rem;
+    width: min(480px, 90vw);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .modal-title {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .modal-body label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.82rem;
+  }
+
+  .modal-body select,
+  .modal-body textarea,
+  .modal-body input {
+    font-size: 0.82rem;
+    margin: 0;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
   }
 </style>

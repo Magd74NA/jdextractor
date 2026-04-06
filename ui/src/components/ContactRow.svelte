@@ -30,7 +30,11 @@
   let generatedSubject = $state("");
   let generatedChannel = $state("");
   let generatedTiming = $state("");
+  let generatedNextDate = $state("");
   let generateError = $state("");
+  let sending = $state(false);
+  let sendError = $state("");
+  let sendSuccess = $state(false);
 
   let editing = $state(false);
   let editName = $state("");
@@ -191,7 +195,10 @@
     generatedSubject = "";
     generatedChannel = "";
     generatedTiming = "";
+    generatedNextDate = "";
     generateError = "";
+    sendError = "";
+    sendSuccess = false;
     try {
       const result = await api.generateFollowupStream(contact.dir, (event) => {
         if (event.stage === "content" && event.delta) {
@@ -202,10 +209,37 @@
       generatedSubject = result.subject ?? "";
       generatedChannel = result.channel ?? "";
       generatedTiming = result.timing ?? "";
+      generatedNextDate = result.suggested_next_date ?? "";
     } catch (e) {
       generateError = e instanceof Error ? e.message : "Generation failed";
     } finally {
       generating = false;
+    }
+  }
+
+  async function markAsSent() {
+    if (!generatedMessage.trim() || !generatedChannel) return;
+    sending = true;
+    sendError = "";
+    try {
+      const sendBody: { content: string; channel: string; next_followup_date?: string } = {
+        content: generatedMessage,
+        channel: generatedChannel,
+      };
+      if (generatedNextDate) sendBody.next_followup_date = generatedNextDate;
+      await api.sendFollowup(contact.dir, sendBody);
+      sendSuccess = true;
+      // Reset panel
+      generatedMessage = "";
+      generatedSubject = "";
+      generatedChannel = "";
+      generatedTiming = "";
+      generatedNextDate = "";
+      await refreshContacts();
+    } catch (e) {
+      sendError = e instanceof Error ? e.message : "Failed to mark as sent";
+    } finally {
+      sending = false;
     }
   }
 
@@ -605,24 +639,72 @@
             <p class="error">{generateError}</p>
           {/if}
 
-          {#if generatedMessage}
+          {#if sendSuccess}
+            <p class="send-success">Logged. {generatedNextDate ? `Next follow-up: ${generatedNextDate}` : "Follow-up date cleared."}</p>
+          {/if}
+
+          {#if generatedMessage || generating}
             <div class="generated">
-              {#if generatedSubject}<p>
-                  <strong>Subject:</strong>
-                  {generatedSubject}
-                </p>{/if}
-              <pre class="message-box">{generatedMessage}</pre>
-              {#if generatedChannel || generatedTiming}
-                <p class="muted">
-                  Channel: {generatedChannel} · Timing: {generatedTiming}
-                </p>
+              {#if generatedSubject}
+                <p class="gen-meta"><strong>Subject:</strong> {generatedSubject}</p>
               {/if}
-              <button class="outline btn-sm" onclick={copyToClipboard}
-                >Copy</button
-              >
+              {#if generatedChannel || generatedTiming}
+                <p class="muted">Channel: {generatedChannel} · Timing: {generatedTiming}</p>
+              {/if}
+              <!-- svelte-ignore a11y_autofocus -->
+              <textarea
+                class="mono"
+                rows={6}
+                bind:value={generatedMessage}
+                disabled={generating}
+                autofocus={!generating}
+              ></textarea>
+              <div class="send-row">
+                <label class="send-date-label">
+                  Next follow-up
+                  <input type="date" bind:value={generatedNextDate} class="edit-input" />
+                </label>
+                <div class="send-actions">
+                  <button class="outline btn-sm" onclick={copyToClipboard} disabled={generating}>Copy</button>
+                  <button
+                    class="btn-sm"
+                    onclick={markAsSent}
+                    aria-busy={sending}
+                    disabled={generating || sending || !generatedMessage.trim()}
+                  >Mark as Sent</button>
+                </div>
+              </div>
+              {#if sendError}
+                <p class="error">{sendError}</p>
+              {/if}
             </div>
           {/if}
         </div>
+
+        <!-- Contact timeline -->
+        {#if contact.conversations.some((c) => c.messages.length > 0)}
+          {@const allMessages = contact.conversations
+            .flatMap((c) =>
+              c.messages.map((m) => ({ ...m, channel: c.channel ?? "" })),
+            )
+            .sort((a, b) => b.date.localeCompare(a.date))}
+          <div class="section">
+            <h4>Timeline</h4>
+            <div class="timeline">
+              {#each allMessages as msg}
+                <div class="tl-entry">
+                  <div class="tl-header">
+                    <span class="tl-date">{msg.date}</span>
+                    <span class="tl-sender">{msg.sender}</span>
+                    {#if msg.channel}<span class="channel-badge">{msg.channel}</span>{/if}
+                    {#if msg.generated}<span class="ai-badge">✦ AI-drafted</span>{/if}
+                  </div>
+                  <p class="tl-content">{msg.content}</p>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </div>
     </td>
   </tr>
@@ -865,6 +947,89 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .gen-meta {
+    font-size: 0.82rem;
+    margin: 0;
+  }
+
+  .send-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .send-date-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    flex: 1;
+  }
+
+  .send-date-label input {
+    margin: 0;
+    font-size: 0.82rem;
+  }
+
+  .send-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .send-success {
+    font-size: 0.82rem;
+    color: var(--pico-ins-color);
+    margin: 0;
+  }
+
+  /* Timeline */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    border-top: 1px solid var(--pico-muted-border-color);
+    padding-top: 0.6rem;
+  }
+
+  .tl-entry {
+    border-left: 2px solid var(--pico-muted-border-color);
+    padding-left: 0.6rem;
+  }
+
+  .tl-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.15rem;
+    flex-wrap: wrap;
+  }
+
+  .tl-date {
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: var(--pico-muted-color);
+  }
+
+  .tl-sender {
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .ai-badge {
+    font-size: 0.68rem;
+    color: var(--pico-primary);
+    opacity: 0.8;
+  }
+
+  .tl-content {
+    font-size: 0.82rem;
+    margin: 0;
+    white-space: pre-wrap;
+    color: var(--pico-muted-color);
   }
 
   /* Job linking */
