@@ -74,9 +74,16 @@ export interface NetworkingStats {
   upcomingFollowups: number;
 }
 
+function localDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function computeNetworkingStats(contacts: Contact[]): NetworkingStats {
-  const today = new Date().toISOString().slice(0, 10);
-  const weekFromNow = new Date(Date.now() + 7 * DAY_S * 1000).toISOString().slice(0, 10);
+  const today = localDateStr(new Date());
+  const weekFromNow = localDateStr(new Date(Date.now() + 7 * DAY_S * 1000));
   return {
     totalContacts: contacts.length,
     activeContacts: contacts.filter(c => c.status !== 'dormant').length,
