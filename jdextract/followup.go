@@ -141,6 +141,7 @@ func GenerateFollowup(
 	systemPrompt := promptConfig.SystemPrompt + "\n\n" + promptConfig.TaskList + "\n\n" + networkingResponseFormat
 
 	var sb strings.Builder
+	fmt.Fprintf(&sb, "Today's date: %s\n\n", time.Now().Format("2006-01-02"))
 	fmt.Fprintf(&sb, "CONTACT:\nName: %s\n", contact.Name)
 	if contact.Company != "" {
 		fmt.Fprintf(&sb, "Company: %s\n", contact.Company)
