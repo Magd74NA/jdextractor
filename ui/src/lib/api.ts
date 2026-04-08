@@ -60,11 +60,16 @@ export const api = {
     request<null>('POST', `/contacts/${id}/conversations/${convIndex}/messages`, msg),
   deleteMessage: (id: string, convIndex: number, msgIndex: number) =>
     request<null>('DELETE', `/contacts/${id}/conversations/${convIndex}/messages/${msgIndex}`),
-  generateFollowup: (id: string) => request<FollowupResult>('POST', `/contacts/${id}/followup`, {}),
+  generateFollowup: (id: string, body: { guidance?: string } = {}) =>
+    request<FollowupResult>('POST', `/contacts/${id}/followup`, body),
   sendFollowup: (id: string, body: { content: string; channel: string; next_followup_date?: string }) =>
     request<Contact>('POST', `/contacts/${id}/followup/send`, body),
-  generateFollowupStream: async (id: string, onProgress: (event: ProgressEvent) => void): Promise<FollowupResult> => {
-    const final = await consumeSSERaw(`${BASE}/contacts/${id}/followup/stream`, {}, onProgress);
+  generateFollowupStream: async (
+    id: string,
+    onProgress: (event: ProgressEvent) => void,
+    body: { guidance?: string } = {},
+  ): Promise<FollowupResult> => {
+    const final = await consumeSSERaw(`${BASE}/contacts/${id}/followup/stream`, body, onProgress);
     return JSON.parse(final.message ?? '{}') as FollowupResult;
   },
   getOverdueFollowups: () => request<Contact[]>('GET', '/contacts/overdue'),

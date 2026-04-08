@@ -34,13 +34,9 @@
     return Math.round((target.getTime() - today.getTime()) / 86400000);
   }
 
-  function lastConvSnippet(contact: Contact): string {
+  function lastConvSummary(contact: Contact): string {
     if (!contact.conversations || contact.conversations.length === 0) return "";
-    const conv = contact.conversations.at(-1);
-    if (!conv) return "";
-    return conv.summary.length > 80 ?
-        conv.summary.slice(0, 77) + "..."
-      : conv.summary;
+    return contact.conversations.at(-1)?.summary ?? "";
   }
 
   function lastChannel(contact: Contact): string {
@@ -71,7 +67,7 @@
               {#if lastChannel(contact)}<span class="channel-badge">{lastChannel(contact)}</span>{/if}
             </div>
             <div class="queue-center">
-              <span class="queue-snippet">{lastConvSnippet(contact)}</span>
+              <span class="queue-snippet">{lastConvSummary(contact)}</span>
             </div>
             <div class="queue-right">
               <span class="queue-date">{contact.follow_up_date}</span>
@@ -99,7 +95,7 @@
               {#if lastChannel(contact)}<span class="channel-badge">{lastChannel(contact)}</span>{/if}
             </div>
             <div class="queue-center">
-              <span class="queue-snippet">{lastConvSnippet(contact)}</span>
+              <span class="queue-snippet">{lastConvSummary(contact)}</span>
             </div>
             <div class="queue-right">
               <span class="queue-date">{contact.follow_up_date}</span>
@@ -177,10 +173,12 @@
   .queue-snippet {
     font-size: 0.78rem;
     color: var(--pico-muted-color);
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
+    line-height: 1.3;
   }
 
   .queue-right {

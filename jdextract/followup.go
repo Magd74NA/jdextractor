@@ -127,6 +127,8 @@ func SummarizeConversation(
 
 // GenerateFollowup builds a prompt from contact context and conversation history,
 // calls the LLM, and parses the XML-tagged response. Follows the same pattern as GenerateAll.
+// guidance is an optional user-supplied string that gets sanitized and injected into the
+// prompt to steer the generation (e.g. "be more casual", "mention the React opening").
 func GenerateFollowup(
 	ctx context.Context,
 	invoker LLMInvoker,
@@ -136,6 +138,7 @@ func GenerateFollowup(
 	c *http.Client,
 	contact ContactMeta,
 	promptConfig NetworkingPromptConfig,
+	guidance string,
 	onDelta func(string),
 ) (*FollowupResult, error) {
 	systemPrompt := promptConfig.SystemPrompt + "\n\n" + promptConfig.TaskList + "\n\n" + networkingResponseFormat
@@ -185,6 +188,10 @@ func GenerateFollowup(
 				fmt.Fprintf(&sb, "[%s] %s: %s\n", msg.Date, msg.Sender, Sanitize(msg.Content))
 			}
 		}
+	}
+
+	if trimmed := strings.TrimSpace(guidance); trimmed != "" {
+		fmt.Fprintf(&sb, "\nAdditional User Guidance: %s\n", Sanitize(trimmed))
 	}
 
 	useStreaming := streamInvoker != nil && onDelta != nil

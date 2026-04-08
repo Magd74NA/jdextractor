@@ -270,9 +270,14 @@ func (a *App) handleGenerateFollowup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var body struct {
+		Guidance string `json:"guidance"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
 	b := a.Backend()
 
-	result, err := GenerateFollowup(r.Context(), b.Invoker, nil, b.APIKey, b.Model, &a.Client, *contact, a.NetworkingPromptConfig, nil)
+	result, err := GenerateFollowup(r.Context(), b.Invoker, nil, b.APIKey, b.Model, &a.Client, *contact, a.NetworkingPromptConfig, body.Guidance, nil)
 	if err != nil {
 		http.Error(w, "generate followup: "+err.Error(), http.StatusBadGateway)
 		return
@@ -293,6 +298,11 @@ func (a *App) handleGenerateFollowupStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	var body struct {
+		Guidance string `json:"guidance"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
 	flusher := initSSE(w)
 	if flusher == nil {
 		return
@@ -306,7 +316,7 @@ func (a *App) handleGenerateFollowupStream(w http.ResponseWriter, r *http.Reques
 		writeSSE(w, flusher, ProgressEvent{Stage: StageContent, Delta: delta})
 	}
 
-	result, err := GenerateFollowup(r.Context(), b.Invoker, b.StreamInvoker, b.APIKey, b.Model, &a.Client, *contact, a.NetworkingPromptConfig, onDelta)
+	result, err := GenerateFollowup(r.Context(), b.Invoker, b.StreamInvoker, b.APIKey, b.Model, &a.Client, *contact, a.NetworkingPromptConfig, body.Guidance, onDelta)
 	if err != nil {
 		writeSSE(w, flusher, ProgressEvent{Stage: StageError, Message: "generate followup: " + err.Error()})
 		return

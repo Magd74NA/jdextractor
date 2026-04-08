@@ -522,6 +522,7 @@ func cmdContactsFollowup(args []string) {
 		&app.Client,
 		*contact,
 		app.NetworkingPromptConfig,
+		"",
 		func(delta string) { fmt.Fprint(os.Stderr, delta) },
 	)
 	if err != nil {

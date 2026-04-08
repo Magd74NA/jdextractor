@@ -15,6 +15,7 @@
   let sendError = $state("");
   let sendSuccess = $state(false);
   let lastSentNextDate = $state("");
+  let guidance = $state("");
 
   async function generate() {
     generating = true;
@@ -27,11 +28,16 @@
     sendError = "";
     sendSuccess = false;
     try {
-      const result = await api.generateFollowupStream(contact.dir, (event) => {
-        if (event.stage === "content" && event.delta) {
-          generatedMessage += event.delta;
-        }
-      });
+      const trimmedGuidance = guidance.trim();
+      const result = await api.generateFollowupStream(
+        contact.dir,
+        (event) => {
+          if (event.stage === "content" && event.delta) {
+            generatedMessage += event.delta;
+          }
+        },
+        trimmedGuidance ? { guidance: trimmedGuidance } : {},
+      );
       generatedMessage = result.message;
       generatedSubject = result.subject ?? "";
       generatedChannel = result.channel ?? "";
@@ -62,6 +68,7 @@
       generatedChannel = "";
       generatedTiming = "";
       generatedNextDate = "";
+      guidance = "";
       onSent?.();
     } catch (e) {
       sendError = e instanceof Error ? e.message : "Failed to mark as sent";
@@ -76,6 +83,13 @@
 </script>
 
 <div class="followup-panel">
+  <textarea
+    class="guidance-input"
+    rows={2}
+    bind:value={guidance}
+    placeholder="Optional: extra guidance for the LLM (e.g. 'be more casual', 'mention the React opening')"
+    disabled={generating}
+  ></textarea>
   <div class="panel-header">
     <button
       class="outline btn-sm"
@@ -146,6 +160,12 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .guidance-input {
+    font-size: 0.82rem;
+    margin: 0;
+    resize: vertical;
   }
 
   .generated {

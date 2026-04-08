@@ -567,7 +567,7 @@
             .flatMap((c) =>
               c.messages.map((m) => ({ ...m, channel: c.channel ?? "" })),
             )
-            .sort((a, b) => b.date.localeCompare(a.date))}
+            .sort((a, b) => a.date.localeCompare(b.date))}
           <div class="section">
             <h4>Timeline</h4>
             <div class="timeline">
